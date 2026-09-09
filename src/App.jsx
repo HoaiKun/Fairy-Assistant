@@ -14,8 +14,14 @@ function App() {
   }
 
   return (
-    <main className=" flex bg-cyan-300 h-full w-full items-full  justify-center">
-      <FairyUI></FairyUI>
+    <main className="w-full h-full"  >
+      <div className=" grid bg-cyan-900 h-full w-full  justify-center">
+
+        <FairyUI className =" items-center justify-center w-full h-full"></FairyUI>
+        
+
+      </div>
+     
     </main>
   );
 }
