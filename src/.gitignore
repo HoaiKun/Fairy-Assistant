@@ -1,0 +1,12 @@
+node_modules/
+dist/
+src-tauri/target/
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+src-tauri/binaries/*
+!src-tauri/binaries/.gitkeep
+.DS_Store
+Thumbs.db
