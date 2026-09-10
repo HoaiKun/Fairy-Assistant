@@ -1,20 +1,27 @@
-import { useState } from "react";
+import { useState , useEffect } from "react";
 import { motion, setTarget, useAnimationFrame, useMotionValue, useSpring } from "framer-motion";
 import { clipPath } from "framer-motion/client";
-function FairyUI()
+
+
+
+function FairyUI({RotateSpeed})
 {
 
-    const [targetSpeed, setTargetSpeed] = useState(60);
-
-    const speed = useSpring(targetSpeed, {damping:20, stiffness: 100});
-
+    const speed = useSpring(RotateSpeed, {damping:20, stiffness: 100});
     const rotate = useMotionValue(0);
+
 
     useAnimationFrame((_, delta) =>
     {
         const currentSpeed = speed.get();
         rotate.set(rotate.get() + (delta/1000) * currentSpeed);
     });
+
+    useEffect(()=>
+    {
+        speed.set(RotateSpeed);
+    })
+
 
 
     let scaleRatio = 1.18;
@@ -28,11 +35,11 @@ function FairyUI()
     return(
     
         <main >          
-            <div className="flex  h-[70vmin] w-[70vmin] items-center justify-center">
+            <div className="flex  h-[75vmin] w-[75vmin] items-center justify-center">
                 <motion.div  
                 animate={{ scale: [1, 1, 1] }}
                 transition={pulseTransition(1.5,0,0)}
-                className=" overflow-hidden absolute flex h-[60vmin] w-[60vmin] items-center rounded-full justify-center bg-blue-700 shadow-2xl drop-shadow-2xl ">
+                className=" overflow-hidden absolute flex h-[60vmin] w-[60vmin] items-center rounded-full justify-center bg-blue-700 shadow-2xl ">
                 
                 <div className = "overflow-hidden flex items-center justify-center w-full h-full">   
                     <motion.div
@@ -69,16 +76,8 @@ function FairyUI()
                         </motion.div> 
 
                     </div>
-
-                    
-
                     </motion.div>
                 </div> 
-            
-
-            <button className="h-30 w-full bg-yellow-700 hover:bg-amber-200 transition-all" onClick={()=>speed.set(0)}>Set Spinning Speed = 0</button>
-            <button className="h-30 w-full bg-yellow-700 hover:bg-amber-200 transition-all" onClick={()=>speed.set(60)}>Set Spinning Speed = 60</button>
-           <button className="h-30 w-full bg-yellow-700 hover:bg-amber-200 transition-all" onClick={()=>speed.set(120)}>Set Spinning Speed = 120</button>
         </main>
     );
 };
