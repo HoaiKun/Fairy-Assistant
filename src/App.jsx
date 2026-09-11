@@ -21,9 +21,10 @@ function App() {
     <main className="w-full h-full"  >
       <div className=" grid bg-cyan-200 h-full w-full justify-center">
 
-        <FairyUI RotateSpeed = {OuterRingRotateSpeed} className =" items-center justify-center w-full h-full"></FairyUI>
+        <FairyUI RotateReverse= {false} RotateSpeed = {OuterRingRotateSpeed} PulseDuration={1} MasterCycle={2.9} className =" items-center justify-center w-full h-full"></FairyUI>
         <button className= "bg-amber-200 transition-all hover:bg-amber-500 h-[15vmin]" onClick={()=>setOuterRingRotateSpeed(120)}>SpeedUp Fairy</button>
         <button className= "bg-amber-200 transition-all hover:bg-amber-500 h-[15vmin]" onClick={()=>setOuterRingRotateSpeed(30)}>Slowdown Fairy</button>
+        
       </div>
      
     </main>

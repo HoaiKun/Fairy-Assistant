@@ -1,13 +1,61 @@
 from openai import OpenAI
-from dotenv import load_dotenv;
+from dotenv import load_dotenv
+import re
 import os
 import json
 load_dotenv();
 
 FairyMain = OpenAI()
 latest_response_id = None
-
 tools = None
+
+class StreamSentenceSplitter:
+    def __init__(self):
+        self.buffer = ""
+        self.min_length = 15
+        self.split_pattern = re.compile(r'([^.?!;\n]+[.?!;\n]+["\'”’\)\]]*)(\s+|$)', re.UNICODE)
+
+    def feed(self, delta: str) ->list[str]:
+        self.buffer += delta
+        sentences = []
+
+        while True:
+            match = self.split_pattern.search(self.buffer)
+            if not match:
+                break
+            candidate = match.group(1).strip()
+
+            if len(candidate) < self.min_length:
+                break
+
+            if(candidate):
+                sentences.append(candidate)
+            self.buffer = self.buffer[match.end() :]
+
+        return sentences
+
+    def flush(self) -> list[str]:
+
+        sentences = []
+        
+        while True:
+            match = self.split_pattern.search(self.buffer)
+            if not match:
+                break
+            candidate = match.group(1).strip()
+            if(candidate):
+                sentences.append(candidate)
+            self.buffer = self.buffer[match.end() :]
+
+
+        remaining = self.buffer.strip()
+        
+        if remaining:
+            sentences.append(remaining)
+        
+        self.buffer = ""
+
+        return sentences
 
 def RunFairyMain(input: str, model = "gpt-4o", ):
 
@@ -35,21 +83,34 @@ def RunFairyMain(input: str, model = "gpt-4o", ):
   
     )
 
+    splitter = StreamSentenceSplitter()
     full_sentence_array = []
-    sentence_container = ""
+    
+
     for item in FairyResponse:
+
         if item.type == "response.created":
             latest_response_id = item.response.id
+
         elif item.type == "response.output_text.delta":
             delta = item.delta
-            sentence_container += delta
-            if len(sentence_container) >= 30:
-                full_sentence_array.append(sentence_container)
-                sentence_container = ""
             print(delta, end = "", flush=True)
+
+            completed_sentence = splitter.feed(delta)
+            for sentence in completed_sentence:
+                full_sentence_array.append(sentence)
+
         elif item.type == "response.completed":
             latest_response_id = item.response.id
+
+    leftover = splitter.flush()
+
+    for sentence in leftover:
+        full_sentence_array.append(sentence)
+
+    print('\n ---')      
     print(full_sentence_array)
+
 
 RunFairyMain(input = input())
 RunFairyMain(input = input())
