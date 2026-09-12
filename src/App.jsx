@@ -8,6 +8,7 @@ function App() {
 
   const [OuterRingRotateSpeed, setOuterRingRotateSpeed] = useState(60);
 
+  const [PulseScaleValue, setPulseScaleValue] = useState([1, 0.95, 1.05, 1]);
 
   const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("");
@@ -21,10 +22,9 @@ function App() {
     <main className="w-full h-full"  >
       <div className=" grid bg-cyan-200 h-full w-full justify-center">
 
-        <FairyUI RotateReverse= {false} RotateSpeed = {OuterRingRotateSpeed} PulseDuration={1} MasterCycle={2.9} className =" items-center justify-center w-full h-full"></FairyUI>
-        <button className= "bg-amber-200 transition-all hover:bg-amber-500 h-[15vmin]" onClick={()=>setOuterRingRotateSpeed(120)}>SpeedUp Fairy</button>
-        <button className= "bg-amber-200 transition-all hover:bg-amber-500 h-[15vmin]" onClick={()=>setOuterRingRotateSpeed(30)}>Slowdown Fairy</button>
-        
+        <FairyUI RotateReverse= {false} PulseKeyFrameValue={PulseScaleValue} RotateSpeed = {OuterRingRotateSpeed} PulseDuration={1} MasterCycle={2.9} className =" items-center justify-center w-full h-full"></FairyUI>
+        <button className="text-2xl text-white bg-amber-300 hover:bg-amber-400 transition-all" onClick={()=>{setPulseScaleValue([1, 0.85, 1.15, 1])}}>UpScale</button>
+        <button className="text-2xl text-white bg-amber-300 hover:bg-amber-400 transition-all" onClick={()=>{setPulseScaleValue([1, 0.95, 1.05, 1])}}>DownScale</button>
       </div>
      
     </main>

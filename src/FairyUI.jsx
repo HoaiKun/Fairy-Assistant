@@ -35,7 +35,7 @@ function useConfiguredPulse(baseProgress, { duration, delay = 0, keyframes, mast
 }
 
 function FairyUI({MasterCycle, RotateSpeed = 60, RotateReverse = false, PulseSpeed = 1, PulseDuration = 1.5, PulseDelay = 0.3, 
-         PulseKeyFrameValue = [1, 0.9, 1.1, 1]
+         PulseKeyFrameValue = [1, 0.85, 1.15, 1]
 })
 {
 
@@ -78,15 +78,48 @@ function FairyUI({MasterCycle, RotateSpeed = 60, RotateReverse = false, PulseSpe
         
         pulsePhase.set((pulsePhase.get() + (milidelta * pulseFreq.get()) /  MasterCycle) %1) ;
     });
-    
+
+
+
     const scaleLayerWhite = useConfiguredPulse(pulsePhase,
        { 
         duration: PulseDuration,
-        delay: PulseDelay,
+        delay: PulseDelay + 0.3,
         keyframes: PulseKeyFrameValue,
         masterCycle : MasterCycle
         }
     );
+    
+    const scaleIrisOne = useConfiguredPulse(pulsePhase,
+       { 
+        duration: PulseDuration,
+        delay: PulseDelay + 0.2,
+        keyframes: PulseKeyFrameValue,
+        masterCycle : MasterCycle
+        }
+    );
+
+    const scaleIrisTwo = useConfiguredPulse(pulsePhase,
+       { 
+        duration: PulseDuration,
+        delay: PulseDelay + 0.1,
+        keyframes: PulseKeyFrameValue,
+        masterCycle : MasterCycle
+        }
+    );
+
+    const scaleIrisThree = useConfiguredPulse(pulsePhase,
+       { 
+        duration: PulseDuration,
+        delay: PulseDelay + 0.2,
+        keyframes: PulseKeyFrameValue,
+        masterCycle : MasterCycle
+        }
+    );
+    
+    
+
+    
 
     let scaleRatio = 1.18;
     const pulseTransition = (duration,delayTime, repeatDelay) => ({
@@ -119,17 +152,17 @@ function FairyUI({MasterCycle, RotateSpeed = 60, RotateReverse = false, PulseSpe
                         </motion.div>
                         
                         <motion.div
-                            style={{scale: scaleLayerWhite}}
+                            style={{scale: scaleIrisOne}}
                             className="absolute flex  h-[20vmin] aspect-square items-center rounded-full justify-center bg-gray-400">   
                         </motion.div>
 
                         <motion.div 
-                            style={{scale: scaleLayerWhite}}
+                            style={{scale: scaleIrisTwo}}
                             className="absolute flex  h-[15vmin] aspect-square items-center rounded-full justify-center bg-blue-700">
                         </motion.div >
                                 
                         <motion.div
-                            style={{scale: scaleLayerWhite}}
+                            style={{scale: scaleIrisThree}}
                             className="absolute flex h-[10vmin] aspect-square items-center rounded-full justify-center bg-blue-950">
                         </motion.div> 
 
