@@ -21,7 +21,7 @@ def save_memory(content:str, category:str = "general", metadata_extra: dict = No
     )
     return doc_id
 
-def search_memory(query:str, limit: int  = 3):
+def search_memory(query:str, limit: int  = 10):
     results = memory_collection.query(
         query_texts=[query],
         n_results=limit

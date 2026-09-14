@@ -1,5 +1,4 @@
 import json
-from tools.get_weather import get_current_weather
 from tools.get_dynamic_memories import get_dynamic_memories
 tools_schema = [
 
@@ -17,48 +16,37 @@ tools_schema = [
     ### Custom tools
 
     {
-            "type": "function",
-            "name" : "get_dynamic_memories",
-            "description": "Get deeply information that storage in the vector database  (for example: user's previous chat session, user's recent activities) ",
-            "parameters" : {
-                "type" : "object",
-                "properties" : {
-                    "search_query" : {
-                        "type" : "string",
-                        "description" : "Name of a specific city or region (Ha Noi, Tokyo,...)"
-                    },
-                },
-                "required" : ["search_query"],
-            }
-    },
-
-    {
         "type": "function",
-        "name" : "get_current_weather",
-        "description": "Get the weather information in specific region",
+        "name" : "get_dynamic_memories",
+        "description": ("A semantic description of the user information being sought (e.g.,"
+                " 'user's class schedule', 'interests', 'weekly plan')."
+                " Incorporate the intent spanning previous messages,"
+                " rather than relying solely on keywords from the final message."),
         "parameters" : {
             "type" : "object",
             "properties" : {
-                "location" : {
+                "search_query" : {
                     "type" : "string",
-                    "description" : "Name of a specific city or region (Ha Noi, Tokyo,...)"
+                    "description" : ("A semantic description of what needs to be retrieved (e.g., "
+                    "'lịch học thời khóa biểu', 'thói quen sinh hoạt', 'kế hoạch tuần', 'work schedule'). "
+                    "Incorporate the overall context of previous turns instead of just the latest word.")
                 },
-                "unit" : {
-                    "type":"string",
-                    "enum": ["celsius", "fahrenheit"],
-                    "default": "celsius",
+                "limit" :
+                {
+                    "type" : "integer",
+                    "description" : "The limit of the searching attemp, the greater the deeper to search and more result to return"
                 }
             },
-            "required" : ["location"],
+            
+            "required" : ["search_query"],
         }
     },
+
     #More tools here
 ]
 
 
-
 tool_registry = {
-    "get_current_weather" : get_current_weather,
     "get_dynamic_memories" : get_dynamic_memories
 
 }

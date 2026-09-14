@@ -1,6 +1,7 @@
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 from tools.tools_general import tools_schema, tool_registry
+from datetime import datetime
 from Database.ChromaDB.ChromaDB_Handler import save_memory, search_memory
 import re
 import os
@@ -19,29 +20,55 @@ ChatHistoryStorage = []
 
 
 def GetGeneralMemories() -> str:
-    return "Context"
+    GeneralKnowledge = ""
+    General_Query = [
+        "current living location, hometown, city, and workplace of the user",
+        "personal hobbies, entertainment interests, favorite games, books, and pastimes of the user",
+        "daily lifestyle routines, sleep schedule, dietary habits, and food preferences",
+        "communication preferences, personality traits, and specific instructions on how Master wants to be treated",
+        "occupation, major, technical skills, programming languages, and current studies of the user"
+
+    ]
+    for item in General_Query:
+        text = ""
+        query_res = search_memory(item, limit=7)
+        for context in query_res:
+            text += context.get("content")
+            text += "  "
+        GeneralKnowledge += text
+        GeneralKnowledge += "\n"
+
+    return GeneralKnowledge
 
 BASE_INSTRUCTION = (
     "You are Fairy, a proud, highly capable AI Assistant with a direct, slightly robotic tone. "
-    "When executing tasks that require tools: "
-    "1. Always output a concise status update before calling a tool (e.g., 'Đang tra cứu thời tiết...', 'Đang kiểm tra thời khóa biểu...'). "
-    "2. When you receive tool outputs, concisely summarize what you found before moving to the next action. "
-    "3. Conclude with a final verdict or recommendation ('Kết luận: ...')."
+    "When executing tasks that require tools:\n"
+    "1. Always output a concise status update before calling a tool.\n"
+    "2. When calling tools, ensure parameter attention is globally grounded across the conversation history:\n"
+    "   - Never let short follow-up answers (e.g. city names, affirmations) overwrite the original search intent.\n"
+    "   - Example: If the user asked 'Will the rain tomorrow affect the class schedule?' and then says 'Ha Noi', "
+    "     you MUST call `get_current_weather(location='Ha Noi')` AND `get_dynamic_memories(search_query='class schedule timetable')`. "
+    "     DO NOT query memories for 'Ha Noi'.\n"
 )
 
-MASTER_CONTEXT = GetGeneralMemories()
+MASTER_GENERAL_CONTEXT = GetGeneralMemories()
 
-FULL_INSTRUCTION = BASE_INSTRUCTION + MASTER_CONTEXT
+print(MASTER_GENERAL_CONTEXT)
 
-async def RunFairyMain(input: str, model = "gpt-4o",  max_steps = 1):
+FULL_INSTRUCTION = BASE_INSTRUCTION + MASTER_GENERAL_CONTEXT
+
+async def RunFairyMain(input: str, model = "gpt-4o-mini", role= "user",  max_steps = 1):
 
     global latest_response_id
     current_input = input
 
+    current_time_str = datetime.now().strftime(
+    "%Y-%m-%d %H:%M (%A, GMT+7)"
+    )
 
     request_response_params = {
         "model" : model,
-        "instructions" : FULL_INSTRUCTION,
+        "instructions" : FULL_INSTRUCTION + f"Current time: {current_time_str}",
         "input" : current_input,
     }
 
@@ -51,7 +78,7 @@ async def RunFairyMain(input: str, model = "gpt-4o",  max_steps = 1):
         ChatHistoryStorage.clear()
 
     ChatHistoryStorage.append({
-    "role":"user",
+    "role":role,
     "content":input
     })
         
@@ -116,17 +143,38 @@ async def RunFairyMain(input: str, model = "gpt-4o",  max_steps = 1):
             "output": json.dumps(result, ensure_ascii = False)
             }
             tools_output.append(tool_response_payload)
-        await RunFairyMain(input=tools_output)
-        
-    asyncio.create_task(execute_save_memory(list(ChatHistoryStorage)))
+        await RunFairyMain(input=tools_output, model=model, role="assistant", max_steps=max_steps)
     
 
 async def execute_save_memory(messages):
 
 
-    instructions = (
-        "Your mission is to summarize text into general knowledge about users as a caring assistant. Make it short without loss of information."
-    )
+    instructions = """
+    You are an expert memory consolidation engine for an AI companion.
+    Analyze the provided conversation history and extract persistent, valuable facts about the user (Master).
+
+    Guidelines:
+    1. Focus ONLY on long-term, durable information:
+    - Personal profile: Living location, workplace, university, major, languages.
+    - Routines & Habits: Daily schedules, sleep patterns, dietary choices, fitness.
+    - Interests: Favorite games, anime, tech stacks, music, hobbies.
+    - Relationships & Preferences: How Master wants to be addressed, communication style, tools Master prefers.
+    2. Ignore transient context:
+    - Greetings, one-off questions, jokes, temporary errors, or short-lived events (e.g., "it rained today").
+    3. Format requirements:
+    - Output as a concise bulleted list where each line is a standalone, self-contained declarative fact.
+    - Always refer to the user as 'Master'.
+    - Write facts in Vietnamese if the context is in Vietnamese, or English if in English.
+    - DO NOT include conversational filler, introductory phrases, or markdown headers.
+    - If no durable facts are discovered, output strictly: 'NONE'.
+
+    Example Output:
+    - Master currently lives and works in Hanoi.
+    - Master is a programmer specializing in C++, Python, and game development.
+    - Master often stays up late working and enjoys drinking black coffee without sugar.
+    """
+
+
 
     input_text = json.dumps(messages, ensure_ascii=False, indent=2)
 
