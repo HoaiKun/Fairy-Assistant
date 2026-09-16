@@ -17,8 +17,6 @@ latest_response_id = None
 
 ChatHistoryStorage = []
 
-
-
 def GetGeneralMemories() -> str:
     GeneralKnowledge = ""
     General_Query = [
@@ -52,8 +50,6 @@ BASE_INSTRUCTION = (
 )
 
 MASTER_GENERAL_CONTEXT = GetGeneralMemories()
-
-print(MASTER_GENERAL_CONTEXT)
 
 FULL_INSTRUCTION = BASE_INSTRUCTION + MASTER_GENERAL_CONTEXT
 
