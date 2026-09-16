@@ -5,6 +5,8 @@ from tools.get_dynamic_memories import get_dynamic_memories
 from tools.launch_app import launch_application
 from tools.control_system import control_system
 from tools.manage_schedule import manage_schedule
+from tools.execute_terminal import execute_terminal_command
+from tools.close_app import close_application
 tools_schema = [
     # 1. Built-in tools
     {"type": "web_search_preview"},
@@ -214,7 +216,66 @@ tools_schema = [
             },
             "required": ["action"]
         }
-    }
+    },
+    {
+        "type": "function",
+        "name": "execute_terminal_command",
+        "description": (
+            "Directly execute PowerShell terminal commands on Master's Windows machine to inspect the system, "
+            "manage files, check network, query processes, or run automation scripts. "
+            "Commands that require manual interactive keyboard inputs or are destructive to OS core files are strictly forbidden."
+            "...manage files, inspect directory trees, read text/code document contents via Get-Content/cat, query processes..."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The exact PowerShell command to run (e.g., 'Get-Process | Sort-Object CPU -Descending | Select-Object -First 5', 'dir', 'git status')."
+                },
+                "working_dir": {
+                    "type": "string",
+                    "description": "Optional directory path to execute the command in. Omit or leave null if executing from default location."
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": "Maximum execution time in seconds before aborting (default is 15 seconds)."
+                }
+            },
+            "required": ["command"]
+        }
+    },
+    {
+        "type": "function",
+        "name": "close_application",
+        "description": (
+            "Terminate or gracefully close a currently running desktop application, IDE, game, "
+            "or background process on Windows by its common name, alias, or executable filename "
+            "(e.g., 'chrome', 'vscode', 'discord', 'maya', 'notepad', 'task manager'). "
+            "Supports graceful termination and forced process killing."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "app_name": {
+                    "type": "string",
+                    "description": (
+                        "The common name, alias, or process executable name of the application to close "
+                        "(e.g., 'vscode', 'google chrome', 'notepad', 'unreal')."
+                    ),
+                },
+                "force": {
+                    "type": "boolean",
+                    "description": (
+                        "Set to true to forcibly kill the process immediately (force quit), "
+                        "or false for a graceful closure (allow app to save/exit cleanly). Defaults to false."
+                    ),
+                    "default": False,
+                },
+            },
+            "required": ["app_name"],
+        },
+    },
 ]
 
 tool_registry = {
@@ -233,6 +294,8 @@ tool_registry = {
     ),
     "launch_application":(launch_application),
     "control_system":(control_system),
-    "manage_schedule":(manage_schedule)
+    "manage_schedule":(manage_schedule),
+    "execute_terminal_command":(execute_terminal_command),
+    "close_application": (close_application)
 
 }
