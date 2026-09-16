@@ -3,6 +3,7 @@ import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import FairyUI from "./FairyUI";
 import "./App.css";
+import {ChatForm} from "./ChatBox";
 
 function App() {
 
@@ -13,20 +14,21 @@ function App() {
   const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("");
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
-
   return (
-    <main className="w-full h-full"  >
-      <div className=" grid bg-cyan-200 h-full w-full justify-center">
+    <main className="flex w-full h-full items-center justify-center"  >
+      <div className="flex  bg-cyan-200 h-full w-full justify-center items-center">
 
-        <FairyUI RotateReverse= {false} PulseKeyFrameValue={PulseScaleValue} RotateSpeed = {OuterRingRotateSpeed} PulseDuration={1} MasterCycle={2.9} className =" items-center justify-center w-full h-full"></FairyUI>
-        <button className="text-2xl text-white bg-amber-300 hover:bg-amber-400 transition-all" onClick={()=>{setPulseScaleValue([1, 0.85, 1.15, 1])}}>UpScale</button>
-        <button className="text-2xl text-white bg-amber-300 hover:bg-amber-400 transition-all" onClick={()=>{setPulseScaleValue([1, 0.95, 1.05, 1])}}>DownScale</button>
-      </div>
-     
+        <FairyUI 
+        RotateReverse= {false} 
+        PulseKeyFrameValue={PulseScaleValue} 
+        RotateSpeed = {OuterRingRotateSpeed} 
+        PulseDuration={1} 
+        MasterCycle={2.9} 
+        className ="absolute items-center justify-center w-full h-full rounded-full"></FairyUI>
+
+        <ChatForm className=" absolute bg-red-400 w-1/2 h-auto"></ChatForm>
+
+      </div> 
     </main>
   );
 }

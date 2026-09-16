@@ -1,5 +1,5 @@
 import { useState , useEffect } from "react";
-import { delay, easeInOut, motion, setTarget, useAnimationFrame, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { color, delay, easeInOut, motion, setTarget, useAnimationFrame, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { clipPath } from "framer-motion/client";
 
 
@@ -35,9 +35,43 @@ function useConfiguredPulse(baseProgress, { duration, delay = 0, keyframes, mast
 }
 
 function FairyUI({MasterCycle, RotateSpeed = 60, RotateReverse = false, PulseSpeed = 1, PulseDuration = 1.5, PulseDelay = 0.3, 
-         PulseKeyFrameValue = [1, 0.85, 1.15, 1]
+         PulseKeyFrameValue = [1, 0.85, 1.15, 1], 
+        RingColorOne = "rgb(37, 99, 235)",     // blue-600
+        RingColorTwo = "rgb(23, 37, 84)",      // blue-950
+        RingColorThree = "rgb(255, 255, 255)", // white
+        RingColorFour = "rgb(191, 219, 254)",  // blue-200
+        GlowRingColor = "rgb(6, 182, 212)"     // cyan-500
 })
 {
+
+    const [RColorOne, setRColorOne] = useState();
+    const [RColorTwo, setRColorTwo] = useState();
+    const [RColorThree, setRColorThree] = useState();
+    const [RColorFour, setRColorFour] = useState();
+    const [GRingColor, setGRingColor] = useState();
+
+    
+
+    useEffect(()=>{
+        setRColorOne(RingColorOne);
+    }, [RColorOne, RingColorOne]);
+
+    useEffect(()=>{
+        setRColorTwo(RingColorTwo);
+    }, [RColorTwo, RingColorTwo]);
+
+    useEffect(()=>{
+        setRColorThree(RingColorThree);
+    }, [RColorThree, RingColorThree]);
+
+    useEffect(()=>{
+        setRColorFour(RingColorFour);
+    }, [RColorFour, RingColorFour]);
+
+    useEffect(()=>{
+        setGRingColor(GlowRingColor);
+    }, [GRingColor, GlowRingColor]);
+
 
     if(!MasterCycle)
     {
@@ -132,38 +166,60 @@ function FairyUI({MasterCycle, RotateSpeed = 60, RotateReverse = false, PulseSpe
     return(
     
         <main >          
-            <div className="flex  h-[75vmin] w-[75vmin] items-center justify-center">
+            <div className="flex  h-[80vmin] w-[80vmin]  items-center justify-center">
+                
+                 <motion.div  
+                 style={{backgroundColor:GRingColor,
+                 }}
+                className= {`absolute flex h-[70vmin] w-[70vmin] items-center rounded-full justify-center transition-all blur-2xl`}>
+                </motion.div>
+
                 <motion.div  
-                className=" overflow-hidden absolute flex h-[60vmin] w-[60vmin] items-center rounded-full justify-center bg-blue-700 shadow-2xl ">
+                style={{backgroundColor:RColorOne}}
+                className= {`overflow-hidden absolute flex h-[60vmin] w-[60vmin] items-center rounded-full justify-center  transition-colors`}>
                 
                 <div className = "overflow-hidden flex items-center justify-center w-full h-full">   
                     <motion.div
-                        style={{rotate}}
-                        className="absolute flex h-[41vmin] w-[41vmin] rounded-xl aspect-square items-center justify-center bg-blue-950">
+                        style={{rotate,
+                            backgroundColor:RColorTwo
+                        }}
+                        className= {`absolute flex h-[41vmin] w-[41vmin] rounded-xl aspect-square items-center justify-center transition-colors`}>
                         </motion.div>
                     
                         <div 
-                            className="absolute flex h-[50vmin] aspect-square items-center rounded-full justify-center bg-blue-950">
+                            style={{backgroundColor:RColorTwo}}
+                            className= {`absolute flex h-[50vmin] aspect-square items-center rounded-full justify-center transition-colors`}>
                         </div>
 
                         <motion.div
-                        style={{scale: scaleLayerWhite}}
-                        className=" absolute flex h-[42vmin] aspect-square items-center rounded-full justify-center bg-white">
+                        style={{scale: scaleLayerWhite,
+                            backgroundColor:RColorThree
+                        }}
+                        className= {`absolute flex h-[42vmin] aspect-square items-center rounded-full justify-center transition-colors`}>
                         </motion.div>
                         
                         <motion.div
-                            style={{scale: scaleIrisOne}}
-                            className="absolute flex  h-[20vmin] aspect-square items-center rounded-full justify-center bg-gray-400">   
+                            style={{scale: scaleIrisOne,
+                                backgroundColor: RColorFour
+                            }}
+                            className= {`absolute flex  h-[20vmin] aspect-square items-center rounded-full justify-center transition-colors`}>   
                         </motion.div>
 
                         <motion.div 
-                            style={{scale: scaleIrisTwo}}
-                            className="absolute flex  h-[15vmin] aspect-square items-center rounded-full justify-center bg-blue-700">
+                            style={{scale: scaleIrisTwo,
+                                backgroundColor: RColorOne,
+                                borderWidth: "2px",
+                                borderStyle: "solid",
+                                borderColor: GRingColor
+                            }}
+                            className= {`absolute flex  h-[15vmin] aspect-square items-center rounded-full justify-center transition-colors`}>
                         </motion.div >
                                 
                         <motion.div
-                            style={{scale: scaleIrisThree}}
-                            className="absolute flex h-[10vmin] aspect-square items-center rounded-full justify-center bg-blue-950">
+                            style={{scale: scaleIrisThree,
+                                backgroundColor:RColorTwo
+                            }}
+                            className= {`absolute flex h-[10vmin] aspect-square items-center rounded-full justify-center transition-colors`}>
                         </motion.div> 
 
                     </div>
