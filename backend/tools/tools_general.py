@@ -7,6 +7,7 @@ from tools.control_system import control_system
 from tools.manage_schedule import manage_schedule
 from tools.execute_terminal import execute_terminal_command
 from tools.close_app import close_application
+from tools.music_tool import play_music
 tools_schema = [
     # 1. Built-in tools
     {"type": "web_search_preview"},
@@ -276,6 +277,29 @@ tools_schema = [
             "required": ["app_name"],
         },
     },
+    {
+        "type": "function",
+        "name": "play_music",
+        "description": (
+            "Search and stream background music or songs requested by Master via YouTube. "
+            "Extracts direct audio stream URL and cover thumbnail, or handles playback controls "
+            "like pause, resume, and stop."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "Song title, artist, genre, or mood keyword to search and stream "
+                        "(e.g., 'Zenless Zone Zero OST', 'cyberpunk lofi', 'bài Cà phê Min'). "
+                        "Required when action is 'play'."
+                    ),
+                }
+            },
+            "required": ["query"],
+        },
+    }
 ]
 
 tool_registry = {
@@ -296,6 +320,7 @@ tool_registry = {
     "control_system":(control_system),
     "manage_schedule":(manage_schedule),
     "execute_terminal_command":(execute_terminal_command),
-    "close_application": (close_application)
+    "close_application": (close_application),
+    "play_music":(play_music)
 
 }

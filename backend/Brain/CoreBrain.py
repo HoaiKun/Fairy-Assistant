@@ -7,6 +7,7 @@ import re
 import os
 import asyncio
 import json
+from pydantic import BaseModel
 load_dotenv()
 
 FairyMain = AsyncOpenAI()
@@ -16,6 +17,12 @@ tools = tools_schema
 latest_response_id = None
 
 ChatHistoryStorage = []
+
+
+class ChatSchema(BaseModel):
+    emotion: str
+    content: str
+
 
 def GetGeneralMemories() -> str:
     GeneralKnowledge = ""
@@ -126,6 +133,7 @@ async def RunFairyMain(input: str, model = "gpt-4o-mini", role= "user",  max_ste
             delta = item.delta
             full_sentence += delta
             print(delta, end = "", flush=True)
+            yield delta
 
         elif item.type == "response.output_item.done":
             output_item = item.item
@@ -166,7 +174,15 @@ async def RunFairyMain(input: str, model = "gpt-4o-mini", role= "user",  max_ste
             "output": json.dumps(result, ensure_ascii = False)
             }
             tools_output.append(tool_response_payload)
-        await RunFairyMain(input=tools_output, model=model, role="assistant", max_steps=max_steps)
+            
+            
+        async for sub_chunk in RunFairyMain(
+            input=tools_output,
+            model=model,
+            role="assistant",
+            max_steps=max_steps - 1
+        ):
+            yield sub_chunk
     
 
 async def execute_save_memory(messages):
