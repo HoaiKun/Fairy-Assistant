@@ -171,7 +171,7 @@ function FairyUI({MasterCycle, RotateSpeed = 60, RotateReverse = false, PulseSpe
                  <motion.div  
                  style={{backgroundColor:GRingColor,
                  }}
-                className= {`absolute flex h-[70vmin] w-[70vmin] items-center rounded-full justify-center transition-all blur-2xl`}>
+                className= {`absolute flex h-[80vmin] w-[80vmin] items-center rounded-full justify-center transition-all blur-3xl`}>
                 </motion.div>
 
                 <motion.div  
@@ -202,13 +202,13 @@ function FairyUI({MasterCycle, RotateSpeed = 60, RotateReverse = false, PulseSpe
                             style={{scale: scaleIrisOne,
                                 backgroundColor: RColorFour
                             }}
-                            className= {`absolute flex  h-[20vmin] aspect-square items-center rounded-full justify-center transition-colors`}>   
+                            className= {`absolute flex h-[20vmin] aspect-square items-center rounded-full justify-center transition-colors`}>   
                         </motion.div>
 
                         <motion.div 
                             style={{scale: scaleIrisTwo,
                                 backgroundColor: RColorOne,
-                                borderWidth: "2px",
+                                borderWidth: "4px",
                                 borderStyle: "solid",
                                 borderColor: GRingColor
                             }}
