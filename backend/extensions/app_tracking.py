@@ -359,6 +359,18 @@ class AppBehaviorTracker:
         for row in top_apps
     ]
     return f"[TODAY TOP USAGE (Limit {limit})]:\n" + "\n".join(lines)
+  
+
+  def get_app_usage_context(self, view_type: str = "daily_summary", limit: int = 10) -> str:
+        """Wrapper điều phối gọi 1 trong 2 hàm con tùy theo view_type."""
+        view_type = str(view_type).lower().strip()
+        
+        if view_type == "recent_sessions":
+            return self.get_recent_sessions_context(limit=limit)
+        elif view_type == "daily_summary":
+            return self.get_daily_top_usage_context(limit=limit)
+        
+        return f"[APP TRACKER]: view_type '{view_type}' không hợp lệ. Chọn 'daily_summary' hoặc 'recent_sessions'."
 
 
 app_tracker = AppBehaviorTracker(

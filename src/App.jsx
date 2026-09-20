@@ -28,18 +28,19 @@ function App() {
         PulseDuration={1} 
         MasterCycle={2.9} 
         className ="absolute z-0 items-center justify-center w-full h-full rounded-full"></FairyUI>
-      <div className="absolute z-10 w-full h-19/20 flex flex-col justify-center items-center gap-2">
-
-        <div className= {`min-h-0 w-full  flex-1 flex justify-center items-center overflow-hidden`}>
-          {iChatHistory &&  <MessageCotainer MessageArray = {Messages}></MessageCotainer>}
-        </div>
-
-        <div className= {`shrink-0 h-auto w-full flex flex-col justify-center items-center`}>
-          <Transcribe></Transcribe>
-          <ChatForm ></ChatForm>
-        </div>
         
-      </div>
+        <div className="absolute z-10 w-full h-19/20 flex flex-col justify-center items-center gap-2">
+
+          <div className= {`min-h-0 w-full  flex-1 flex justify-center items-center overflow-hidden`}>
+            {iChatHistory &&  <MessageCotainer MessageArray = {Messages}></MessageCotainer>}
+          </div>
+
+          <div className= {`shrink-0 h-auto w-full flex flex-col justify-center items-center`}>
+            <Transcribe></Transcribe>
+            <ChatForm ></ChatForm>
+          </div>
+          
+        </div>
 
 
       </div> 

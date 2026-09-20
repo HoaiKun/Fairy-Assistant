@@ -1,17 +1,72 @@
 import json
 from extensions.app_tracking import app_tracker 
 from extensions.system_tracking import system_tracker
-from tools.get_dynamic_memories import get_dynamic_memories
-from tools.launch_app import launch_application
 from tools.control_system import control_system
 from tools.manage_schedule import manage_schedule
 from tools.execute_terminal import execute_terminal_command
-from tools.close_app import close_application
+from tools.manage_app import manage_application
 from tools.music_tool import play_music
+from tools.manage_memory import manage_memory
 tools_schema = [
     # 1. Built-in tools
     {"type": "web_search_preview"},
     # 2. Custom tools (Flattened for Responses API)
+
+    {
+        "type": "function",
+        "name": "manage_memory",
+        "description": (
+            "Comprehensive memory management tool. "
+            "Use 'search_semantic' to query long-term knowledge, personal facts, and preferences from vector storage (ChromaDB). "
+            "Use 'load_history' to fetch structured conversational logs from PostgreSQL with optional session and time range filtering. "
+            "Use 'save_message' to log a dialogue record into database."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["search_semantic", "load_history", "save_message"],
+                    "description": "The target memory subroutine to execute."
+                },
+                "search_query": {
+                    "type": "string",
+                    "description": "Search phrase for semantic retrieval (Required for 'search_semantic')."
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Identifier of the conversation thread (Required for 'save_message', optional for 'load_history')."
+                },
+                "role": {
+                    "type": "string",
+                    "enum": ["user", "assistant", "system"],
+                    "description": "Speaker role for persisting message. Default is 'user'."
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Raw dialogue message content to persist (Required for 'save_message')."
+                },
+                "session_title": {
+                    "type": "string",
+                    "description": "Optional title when creating a new session record."
+                },
+                "start_time": {
+                    "type": "string",
+                    "description": "ISO timestamp (e.g. '2026-09-18' or '2026-09-20 00:00:00') to filter messages on or after this time."
+                },
+                "end_time": {
+                    "type": "string",
+                    "description": "ISO timestamp (e.g. '2026-09-20 23:59:59') to filter messages up to this time."
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max entries to fetch (default: 10).",
+                    "default": 10
+                }
+            },
+            "required": ["action"]
+        }
+    },
     {
         "type": "function",
         "name": "get_dynamic_memories",
@@ -46,96 +101,56 @@ tools_schema = [
     },
     {
         "type": "function",
-        "name": "get_recent_sessions_context",
+        "name": "get_app_usage_context",
         "description": (
-            "Retrieve a chronological log of recent desktop application"
-            " sessions, complete with exact start/end timestamps (HH:MM),"
-            " active window titles, and categories. Useful for analyzing recent"
-            " user activity sequences, verifying workflow focus, or"
-            " identifying late-night computer usage."
+            "Retrieve desktop application usage logs and statistics from PostgreSQL. "
+            "Use 'daily_summary' for aggregated app runtime/late-night stats today, "
+            "or 'recent_sessions' for the chronological log of recently active windows."
         ),
         "parameters": {
             "type": "object",
             "properties": {
+                "view_type": {
+                    "type": "string",
+                    "enum": ["daily_summary", "recent_sessions"],
+                    "description": (
+                        "Type of log to retrieve: 'daily_summary' for total time spent per app today, "
+                        "or 'recent_sessions' for recent timeline sessions with timestamps."
+                    ),
+                    "default": "daily_summary"
+                },
                 "limit": {
                     "type": "integer",
-                    "description": (
-                        "Number of recent application sessions to return."
-                        " Defaults to 10."
-                    ),
-                    "default": 10,
+                    "description": "Number of records to fetch. Default is 10.",
+                    "default": 10
                 }
             },
-            "required": [],
-        },
+            "required": ["view_type"]
+        }
     },
     {
         "type": "function",
-        "name": "get_daily_top_usage_context",
+        "name": "get_system_telemetry",
         "description": (
-            "Query the PostgreSQL database for an aggregated summary of"
-            " today's application usage. Returns total active duration"
-            " (minutes), launch session counts, and late-night usage metrics"
-            " (00:00–05:00) per software to assess overall productivity versus"
-            " leisure time."
+            "Query Windows machine hardware specifications or real-time performance telemetry. "
+            "Use 'live_metrics' for active CPU/RAM/GPU load, temperatures, VRAM, and thermal/load alerts. "
+            "Use 'static_specs' for CPU model, total RAM capacity, GPU model, and OS build info."
         ),
         "parameters": {
             "type": "object",
             "properties": {
-                "limit": {
-                    "type": "integer",
+                "target": {
+                    "type": "string",
+                    "enum": ["live_metrics", "static_specs"],
                     "description": (
-                        "Maximum number of top-used applications to fetch."
-                        " Defaults to 100."
+                        "'live_metrics': Real-time hardware utilization, temps, active window, and alerts. "
+                        "'static_specs': Fixed machine specifications (CPU, total RAM, GPU model, OS)."
                     ),
-                    "default": 100,
+                    "default": "live_metrics"
                 }
             },
-            "required": [],
-        },
-    },
-    {
-        "type": "function",
-        "name": "get_live_metrics_summary",
-        "description": (
-            "Fetch real-time hardware telemetry and performance snapshots,"
-            " including CPU/RAM/Disk utilization percentages, GPU temperature"
-            " and load, VRAM allocation, battery status, and critical system"
-            " alert flags (e.g., CPU > 85%, RAM > 90%, GPU overheating > 85°C)."
-            " Use to detect system bottlenecks or thermal throttling."
-        ),
-        "parameters": {"type": "object", "properties": {}, "required": []},
-    },
-    {
-        "type": "function",
-        "name": "get_static_specs_summary",
-        "description": (
-            "Retrieve persistent machine hardware specifications, including"
-            " the CPU model, total physical RAM capacity, GPU model, dedicated"
-            " VRAM capacity, and Windows OS build version. Use to answer"
-            " system configuration inquiries or assess compatibility for games,"
-            " 3D rendering engines, and local AI model execution."
-        ),
-        "parameters": {"type": "object", "properties": {}, "required": []},
-    },
-    {
-    "type": "function",
-    "name": "launch_application",
-    "description": (
-        "Launch an installed application, IDE, game, or tool on the computer based on its natural name "
-        "or common alias (e.g., 'vscode', 'discord', 'maya', 'blender', 'chrome', 'unreal', 'genshin'). "
-        "Automatically checks recent app history, Start Menu shortcuts, and Windows Registry."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "app_name": {
-                "type": "string",
-                "description": "The common name or alias of the program to launch (e.g., 'vs code', 'maya', 'unreal engine', 'telegram')."
-            }
-        },
-        "required": ["app_name"]
-    }
+            "required": ["target"]
+        }
     },
     {
         "type": "function",
@@ -248,37 +263,6 @@ tools_schema = [
     },
     {
         "type": "function",
-        "name": "close_application",
-        "description": (
-            "Terminate or gracefully close a currently running desktop application, IDE, game, "
-            "or background process on Windows by its common name, alias, or executable filename "
-            "(e.g., 'chrome', 'vscode', 'discord', 'maya', 'notepad', 'task manager'). "
-            "Supports graceful termination and forced process killing."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "app_name": {
-                    "type": "string",
-                    "description": (
-                        "The common name, alias, or process executable name of the application to close "
-                        "(e.g., 'vscode', 'google chrome', 'notepad', 'unreal')."
-                    ),
-                },
-                "force": {
-                    "type": "boolean",
-                    "description": (
-                        "Set to true to forcibly kill the process immediately (force quit), "
-                        "or false for a graceful closure (allow app to save/exit cleanly). Defaults to false."
-                    ),
-                    "default": False,
-                },
-            },
-            "required": ["app_name"],
-        },
-    },
-    {
-        "type": "function",
         "name": "play_music",
         "description": (
             "Search and stream background music or songs requested by Master via YouTube. "
@@ -299,28 +283,58 @@ tools_schema = [
             },
             "required": ["query"],
         },
+    },
+    {
+        "type": "function",
+        "name": "manage_application",
+        "description": (
+            "Manage desktop applications and processes on Windows. "
+            "Supports launching apps by name/alias or closing running process instances."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["launch", "close"],
+                    "description": "'launch' to start an application, or 'close' to terminate its processes."
+                },
+                "app_name": {
+                    "type": "string",
+                    "description": (
+                        "Common name, alias, or executable file name of the application "
+                        "(e.g., 'vscode', 'maya', 'blender', 'chrome', 'unreal', 'notepad')."
+                    )
+                },
+                "force": {
+                    "type": "boolean",
+                    "description": (
+                        "Only used when action='close'. Set to true for forceful termination (kill), "
+                        "or false for graceful exit (terminate). Defaults to false."
+                    ),
+                    "default": False
+                }
+            },
+            "required": ["action", "app_name"]
+        }
     }
 ]
 
 tool_registry = {
-    "get_dynamic_memories": get_dynamic_memories,
-    "get_recent_sessions_context": (
-        app_tracker.get_recent_sessions_context
-    ),
-    "get_daily_top_usage_context": (
-        app_tracker.get_daily_top_usage_context
-    ),
-    "get_live_metrics_summary": (
-        system_tracker.get_live_metrics_summary
-    ),
-    "get_static_specs_summary": (
-        system_tracker.get_static_specs_summary
-    ),
-    "launch_application":(launch_application),
+
+    "manage_memory" : manage_memory,
+    "get_app_usage_context": app_tracker.get_app_usage_context,
+
+    "get_system_telemetry": system_tracker.get_system_telemetry,
+
+    "manage_application": manage_application,
+
     "control_system":(control_system),
+
     "manage_schedule":(manage_schedule),
+
     "execute_terminal_command":(execute_terminal_command),
-    "close_application": (close_application),
+
     "play_music":(play_music)
 
 }
