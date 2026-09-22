@@ -91,7 +91,7 @@ MASTER_GENERAL_CONTEXT = GetGeneralMemories()
 
 FULL_INSTRUCTION = BASE_INSTRUCTION + MASTER_GENERAL_CONTEXT
 
-async def RunFairyMain(input: str, model = "gpt-4o-mini", role= "user", session = ""  max_steps = 1):
+async def RunFairyMain(input: str, model = "gpt-4o-mini", role= "user", session = "",  max_steps = 1):
 
     global latest_response_id
     current_input = input
