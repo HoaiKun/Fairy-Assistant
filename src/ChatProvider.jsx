@@ -5,9 +5,14 @@ const ChatContext = createContext(null);
 
 export function ChatProvider({children})
 {
+
+    const [IsInVoice, setIsInVoice] = useState(false);
+    const [IsOutVoice, setIsOutVoice] = useState(false);
     const [iChatHistory, setiChatHistory] = useState(true);
+
     const [Messages, setMessages] = useState([
-    { id: 1, role: "bot", content: "Xin chào! Bạn cần giúp gì?" },]);
+    { id: 1, role: "bot", content: "Xin chào! Bạn cần giúp gì?", type:"text" },
+    {id: 2, role:"bot", content:"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS_IW5IjXyLDb3rDt7iGUeyduUTk281QNw3PMx9zt2w9Q&s=10", type:"image"}]);
     const [InputText, setInputText] = useState("");
     
     const socketRef = useRef(null);
@@ -85,7 +90,8 @@ export function ChatProvider({children})
 
 
     return (
-            <ChatContext.Provider value={{Messages, setMessages, InputText, setInputText, sendMessage, iChatHistory, setiChatHistory}}>
+            <ChatContext.Provider value={{Messages, setMessages, InputText, setInputText, sendMessage, 
+            iChatHistory, setiChatHistory, IsInVoice, setIsInVoice, IsOutVoice, setIsOutVoice}}>
                 {children}
             </ChatContext.Provider>
     )

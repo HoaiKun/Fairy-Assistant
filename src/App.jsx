@@ -19,7 +19,7 @@ function App() {
 
   return (
     <main className="flex w-full h-full items-center justify-center"  >
-      <div className="flex bg-cyan-200 h-full w-full justify-center items-center">
+      <div className="flex bg-cyan-800 h-full w-full justify-center items-center">
 
         <FairyUI 
         RotateReverse= {false} 
