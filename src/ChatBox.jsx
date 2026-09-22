@@ -14,7 +14,10 @@ export class MessageSchema {
 export function ChatForm({BorderColor = "border-blue-300"})
 {
 
-    const {InputText, setInputText, sendMessage , iChatHistory,setiChatHistory, IsInVoice, setIsInVoice, IsOutVoice, setIsOutVoice} = useChat();
+    const {InputText, setInputText, sendMessage , iChatHistory,setiChatHistory, IsInVoice, setIsInVoice, IsOutVoice, setIsOutVoice, sendVoiceMessage, startListening,    
+            stopListening,
+            toggleMic,
+            toggleVoice} = useChat();
     const handleSubmit = (e) => {
     e.preventDefault();     
 
@@ -29,6 +32,7 @@ export function ChatForm({BorderColor = "border-blue-300"})
             handleSubmit(e);
         }
     }
+
 
     return(
 
@@ -45,7 +49,7 @@ export function ChatForm({BorderColor = "border-blue-300"})
                      <button className=" flex-2 w-full bg-cyan-100 rounded-2xl hover:bg-cyan-500 transition-colors" type="submit">Enter</button>
                      <div className=" flex flex-1 w-full gap-1 ">
 
-                            <button className="flex-1 flex self-stretch rounded-2xl transition-colors bg-cyan-100 hover:bg-cyan-500 items-center justify-center" type="button">
+                            <button className="flex-1 flex self-stretch rounded-2xl transition-colors bg-cyan-100 hover:bg-cyan-500 items-center justify-center" type="button" onClick={toggleMic}>
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-4">
                                 <path d="M8 1a2 2 0 0 0-2 2v4a2 2 0 1 0 4 0V3a2 2 0 0 0-2-2Z" />
                                 <path d="M4.5 7A.75.75 0 0 0 3 7a5.001 5.001 0 0 0 4.25 4.944V13.5h-1.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-1.5v-1.556A5.001 5.001 0 0 0 13 7a.75.75 0 0 0-1.5 0 3.5 3.5 0 1 1-7 0Z" />
@@ -53,7 +57,7 @@ export function ChatForm({BorderColor = "border-blue-300"})
                             </button>
 
                             <button className="flex-1 flex self-stretch rounded-2xl transition-colors bg-cyan-100 hover:bg-cyan-500 items-center justify-center" type="button"
-                            onClick={()=>setIsOutVoice(!IsOutVoice)}>
+                            onClick={toggleVoice}>
                                 {
                                     IsOutVoice ? 
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
@@ -87,12 +91,13 @@ export function MessageFrame({Content = "NULL", role = "bot", type="text"})
     
     return(
         <main className="container w-2/3 h-auto bg-cyan-950 rounded-2xl pt-1 pb-1 pl-2 pr-2">
-            {type === "text" ?
-            <p className=" w-full h-ful text-white whitespace-pre-line">{Content}</p> :
+            {type === "image" ?
             <div className="h-full w-full">
                 <img src={Content} alt="IMAGE" className="h-full w-full object-cover block">
                 </img>
-            </div>
+            </div> :
+            <p className=" w-full h-ful text-white whitespace-pre-line">{Content}</p> 
+            
             }
         </main>
     )

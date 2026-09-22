@@ -8,7 +8,7 @@ import { useChat } from "./ChatProvider";
 
 function App() {
 
-  const [OuterRingRotateSpeed, setOuterRingRotateSpeed] = useState(60);
+  const [OuterRingRotateSpeed, setOuterRingRotateSpeed] = useState(120);
   const [PulseScaleValue, setPulseScaleValue] = useState([1, 0.95, 1.05, 1]);
   const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("");
