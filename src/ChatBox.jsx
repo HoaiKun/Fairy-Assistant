@@ -133,7 +133,7 @@ export function MessageCotainer({MessageArray = [{role:"bot", type:"text", conte
     )
 };
 
-export function Transcribe({content = "NULL"})
+export function Trans({content = "NULL"})
 {
     return(
         <div className="w-auto h-auto">

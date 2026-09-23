@@ -243,7 +243,9 @@ async def main():
                 print("\n[Fairy: Đã lưu phiên làm việc. Tạm biệt!]")
                 break
 
-            await RunFairyMain(user_input)
+            # SỬA TẠI ĐÂY: Dùng async for thay vì await
+            async for _ in RunFairyMain(user_input):
+                pass
 
         except (KeyboardInterrupt, EOFError):
             print("\n\n[Fairy: Nhận tín hiệu ngắt. Đang lưu ký ức trước khi thoát...]")

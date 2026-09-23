@@ -3,7 +3,7 @@ import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import FairyUI from "./FairyUI";
 import "./App.css";
-import {ChatForm, MessageCotainer, MessageSchema, Transcribe} from "./ChatBox";
+import {ChatForm, MessageCotainer, MessageSchema, Trans} from "./ChatBox";
 import { useChat } from "./ChatProvider";
 
 function App() {
@@ -15,7 +15,7 @@ function App() {
 
 
 
-  const {Messages, setMessages, InputText, setInputText, sendMessage, iChatHistory, setiChatHistory} = useChat();
+  const {Messages, setMessages, InputText, setInputText, sendMessage, iChatHistory, setiChatHistory, SubText} = useChat();
 
   return (
     <main className="flex w-full h-full items-center justify-center"  >
@@ -36,7 +36,7 @@ function App() {
           </div>
 
           <div className= {`shrink-0 h-auto w-full flex flex-col justify-center items-center`}>
-            <Transcribe></Transcribe>
+            {!iChatHistory && <Trans content={SubText}></Trans>}
             <ChatForm ></ChatForm>
           </div>
           

@@ -5,15 +5,15 @@ import { useAudioRecorder } from "./hooks/AudioRecorder";
 const ChatContext = createContext(null);
 
 export function ChatProvider({ children }) {
-    const audioQueueRef = useRef([]);
+    const audioQueueRef = useRef([]); // Lưu danh sách object: { audio_data, sentence }
     const isPlayingRef = useRef(false);
     const currentAudioRef = useRef(null);
 
-    // 1. ĐỔI MẶC ĐỊNH SANG TRUE VÀ DÙNG THÊM REF ĐỂ CHỐNG STALE CLOSURE
-    const [IsOutVoice, setIsOutVoice] = useState(true);
-    const isOutVoiceRef = useRef(true);
+    const [IsOutVoice, setIsOutVoice] = useState(false);
+    const isOutVoiceRef = useRef(false);
 
-    // Đồng bộ state và ref mỗi khi user toggle
+    const [SubText, setSubText] = useState("TEST");
+
     const handleToggleVoice = (val) => {
         setIsOutVoice(val);
         isOutVoiceRef.current = val;
@@ -23,11 +23,22 @@ export function ChatProvider({ children }) {
         if (audioQueueRef.current.length === 0) {
             isPlayingRef.current = false;
             currentAudioRef.current = null;
+            setSubText("");
             return;
         }
 
         isPlayingRef.current = true;
-        const base64Audio = audioQueueRef.current.shift();
+        
+        // Lấy chunk gồm dữ liệu âm thanh và sentence tương ứng
+        const nextItem = audioQueueRef.current.shift();
+        const base64Audio = typeof nextItem === "string" ? nextItem : nextItem?.audio_data;
+        const sentence = typeof nextItem === "object" ? nextItem?.sentence : "";
+
+        if (sentence) {
+            setSubText(sentence);
+            console.log("ALERTING" + sentence);
+        }
+
         const audio = new Audio(`data:audio/mp3;base64,${base64Audio}`);
         currentAudioRef.current = audio;
 
@@ -47,20 +58,18 @@ export function ChatProvider({ children }) {
     };
 
     const stopAudioPlayback = () => {
-        // 1. Xóa sạch hàng đợi ngay lập tức
         audioQueueRef.current = [];
         isPlayingRef.current = false;
+        setSubText(""); // Reset subtitle ngay lập tức khi dừng audio
 
-        // 2. Cắt đứt hoàn toàn audio element hiện tại
         if (currentAudioRef.current) {
-            // QUAN TRỌNG NHẤT: Hủy callback onended để nó KHÔNG gọi playNextAudioChunk nữa!
             currentAudioRef.current.onended = null;
             currentAudioRef.current.onerror = null;
 
             currentAudioRef.current.pause();
             currentAudioRef.current.currentTime = 0;
-            currentAudioRef.current.removeAttribute("src"); // Xóa triệt để source
-            currentAudioRef.current.load(); // Reset trạng thái buffer của HTMLAudioElement
+            currentAudioRef.current.removeAttribute("src");
+            currentAudioRef.current.load();
             currentAudioRef.current = null;
         }
         console.log("[Audio] Đã cưỡng chế dừng toàn bộ âm thanh!");
@@ -123,17 +132,22 @@ export function ChatProvider({ children }) {
                     });
                 }
                 else if (receivedMsg.type === "audio_chunk") {
-                    // DÙNG isOutVoiceRef.current THAY VÌ STATE BIẾN THƯỜNG
                     console.log("[WS] Nhận audio_chunk từ server, check Voice:", isOutVoiceRef.current);
 
                     if (isOutVoiceRef.current && receivedMsg.audio_data) {
-                        audioQueueRef.current.push(receivedMsg.audio_data);
-                        console.log("Speaking desuwa");
-                        
+                        audioQueueRef.current.push({
+                            audio_data: receivedMsg.audio_data,
+                            sentence: receivedMsg.text || ""
+                        });
+
                         if (!isPlayingRef.current) {
                             playNextAudioChunk();
                         }
                     }
+                }
+                else if (receivedMsg.type === "transcribed_text") {
+                    const MessObj = new MessageSchema(receivedMsg.role, "text", receivedMsg.content);
+                    setMessages((prev) => [...prev, MessObj]);
                 }
             } catch (err) {
                 console.error("Parsed error", err);
@@ -165,20 +179,17 @@ export function ChatProvider({ children }) {
     };
 
     const toggleVoice = () => {
-    const newState = !IsOutVoice;
-    
-    // Cập nhật cả State lẫn Ref cùng lúc
-    setIsOutVoice(newState);
-    if (isOutVoiceRef) {
+        const newState = !IsOutVoice;
+        
+        setIsOutVoice(newState);
+        if (isOutVoiceRef) {
             isOutVoiceRef.current = newState;
         }
 
-        // Nếu tắt voice -> Dừng loa ngay lập tức
         if (!newState) {
             stopAudioPlayback();
         }
 
-        // Bắn thông báo cho Backend đổi cờ hủy TTS task
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({
                 type: "toggle_voice",
@@ -192,11 +203,12 @@ export function ChatProvider({ children }) {
             Messages, setMessages, InputText, setInputText, sendMessage,
             iChatHistory, setiChatHistory,
             IsOutVoice,
-            setIsOutVoice: handleToggleVoice, // Bọc hàm để cập nhật luôn cả Ref
+            setIsOutVoice: handleToggleVoice,
             startListening,
             stopListening,
             toggleMic: isListening ? stopListening : startListening,
-            toggleVoice
+            toggleVoice,
+            SubText, setSubText
         }}>
             {children}
         </ChatContext.Provider>
