@@ -40,7 +40,7 @@ function FairyUI({MasterCycle, RotateSpeed = 60, RotateReverse = false, PulseSpe
         RingColorTwo = "rgb(23, 37, 84)",      // blue-950
         RingColorThree = "rgb(255, 255, 255)", // white
         RingColorFour = "rgb(191, 219, 254)",  // blue-200
-        GlowRingColor = "rgb(6, 182, 212)"     // cyan-500
+        GlowRingColor = "rgb(0, 122, 153)"     // cyan-500
 })
 {
 

@@ -206,7 +206,8 @@ export function ChatProvider({ children }) {
             setIsOutVoice: handleToggleVoice,
             startListening,
             stopListening,
-            toggleMic: isListening ? stopListening : startListening,
+            toggleMic: (isListening ? stopListening : startListening),
+            isListening,
             toggleVoice,
             SubText, setSubText
         }}>

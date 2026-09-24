@@ -11,11 +11,12 @@ export class MessageSchema {
     }
 }
 
-export function ChatForm({BorderColor = "border-blue-300"})
+export function ChatForm({BorderColor = "border-blue-300/50"})
 {
 
     const {InputText, setInputText, sendMessage , iChatHistory,setiChatHistory, IsInVoice, setIsInVoice, IsOutVoice, setIsOutVoice, sendVoiceMessage, startListening,    
             stopListening,
+            isListening,
             toggleMic,
             toggleVoice} = useChat();
     const handleSubmit = (e) => {
@@ -46,17 +47,17 @@ export function ChatForm({BorderColor = "border-blue-300"})
                 text-1xl"></textarea>
 
                 <div className="flex flex-col w-1/5 self-stretch bg-transparent justify-center p-1 gap-1.5">
-                     <button className=" flex-2 w-full bg-cyan-100 rounded-2xl hover:bg-cyan-500 transition-colors" type="submit">Enter</button>
+                     <button className= {`flex-2 w-full bg-cyan-100 rounded-2xl hover:bg-cyan-500 transition-colors`} type="submit">Enter</button>
                      <div className=" flex flex-1 w-full gap-1 ">
 
-                            <button className="flex-1 flex self-stretch rounded-2xl transition-colors bg-cyan-100 hover:bg-cyan-500 items-center justify-center" type="button" onClick={toggleMic}>
+                            <button className= {`flex-1 flex self-stretch rounded-2xl transition-colors ${!isListening ? "bg-cyan-100" : "bg-cyan-500"} items-center justify-center`} type="button" onClick={toggleMic}>
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-4">
                                 <path d="M8 1a2 2 0 0 0-2 2v4a2 2 0 1 0 4 0V3a2 2 0 0 0-2-2Z" />
                                 <path d="M4.5 7A.75.75 0 0 0 3 7a5.001 5.001 0 0 0 4.25 4.944V13.5h-1.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-1.5v-1.556A5.001 5.001 0 0 0 13 7a.75.75 0 0 0-1.5 0 3.5 3.5 0 1 1-7 0Z" />
                                 </svg>
                             </button>
 
-                            <button className="flex-1 flex self-stretch rounded-2xl transition-colors bg-cyan-100 hover:bg-cyan-500 items-center justify-center" type="button"
+                            <button className= {`flex-1 flex self-stretch rounded-2xl transition-colors ${!IsOutVoice ? "bg-cyan-100" : "bg-cyan-500"} items-center justify-center`} type="button"
                             onClick={toggleVoice}>
                                 {
                                     IsOutVoice ? 
@@ -73,7 +74,7 @@ export function ChatForm({BorderColor = "border-blue-300"})
                                 
                             </button>
 
-                            <button className="flex-1 flex self-stretch rounded-2xl transition-colors bg-cyan-100 hover:bg-cyan-500 items-center justify-center" onClick={() => setiChatHistory(!iChatHistory)} type="button">
+                            <button className= {`flex-1 flex self-stretch rounded-2xl transition-colors ${!iChatHistory ? "bg-cyan-100" : "bg-cyan-500"} items-center justify-center`} onClick={() => setiChatHistory(!iChatHistory)} type="button">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-4">
                                 <path d="M2 4a2 2 0 0 1 2-2h8a2 2 0 1 1 0 4H4a2 2 0 0 1-2-2ZM2 9.25a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 9.25ZM2.75 12.5a.75.75 0 0 0 0 1.5h10.5a.75.75 0 0 0 0-1.5H2.75Z" />
                                 </svg>
