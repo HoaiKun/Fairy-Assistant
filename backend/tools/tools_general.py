@@ -5,68 +5,13 @@ from tools.control_system import control_system
 from tools.manage_schedule import manage_schedule
 from tools.execute_terminal import execute_terminal_command
 from tools.manage_app import manage_application
-from tools.music_tool import play_music
-from tools.manage_memory import manage_memory
+from tools.music_tool import manage_playback
+from Database.ChromaDB.ChromaDB_Handler import handle_general_memory
 tools_schema = [
     # 1. Built-in tools
     {"type": "web_search_preview"},
     # 2. Custom tools (Flattened for Responses API)
 
-    {
-        "type": "function",
-        "name": "manage_memory",
-        "description": (
-            "Comprehensive memory management tool. "
-            "Use 'search_semantic' to query long-term knowledge, personal facts, and preferences from vector storage (ChromaDB). "
-            "Use 'load_history' to fetch structured conversational logs from PostgreSQL with optional session and time range filtering. "
-            "Use 'save_message' to log a dialogue record into database."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string",
-                    "enum": ["search_semantic", "load_history", "save_message"],
-                    "description": "The target memory subroutine to execute."
-                },
-                "search_query": {
-                    "type": "string",
-                    "description": "Search phrase for semantic retrieval (Required for 'search_semantic')."
-                },
-                "session_id": {
-                    "type": "string",
-                    "description": "Identifier of the conversation thread (Required for 'save_message', optional for 'load_history')."
-                },
-                "role": {
-                    "type": "string",
-                    "enum": ["user", "assistant", "system"],
-                    "description": "Speaker role for persisting message. Default is 'user'."
-                },
-                "content": {
-                    "type": "string",
-                    "description": "Raw dialogue message content to persist (Required for 'save_message')."
-                },
-                "session_title": {
-                    "type": "string",
-                    "description": "Optional title when creating a new session record."
-                },
-                "start_time": {
-                    "type": "string",
-                    "description": "ISO timestamp (e.g. '2026-09-18' or '2026-09-20 00:00:00') to filter messages on or after this time."
-                },
-                "end_time": {
-                    "type": "string",
-                    "description": "ISO timestamp (e.g. '2026-09-20 23:59:59') to filter messages up to this time."
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Max entries to fetch (default: 10).",
-                    "default": 10
-                }
-            },
-            "required": ["action"]
-        }
-    },
     {
         "type": "function",
         "name": "get_dynamic_memories",
@@ -263,66 +208,104 @@ tools_schema = [
     },
     {
         "type": "function",
-        "name": "play_music",
+        "name": "manage_playback",
         "description": (
-            "Search and stream background music or songs requested by Master via YouTube. "
-            "Extracts direct audio stream URL and cover thumbnail, or handles playback controls "
-            "like pause, resume, and stop."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": (
-                        "Song title, artist, genre, or mood keyword to search and stream "
-                        "(e.g., 'Zenless Zone Zero OST', 'cyberpunk lofi', 'bài Cà phê Min'). "
-                        "Required when action is 'play'."
-                    ),
-                }
-            },
-            "required": ["query"],
-        },
-    },
-    {
-        "type": "function",
-        "name": "manage_application",
-        "description": (
-            "Manage desktop applications and processes on Windows. "
-            "Supports launching apps by name/alias or closing running process instances."
+            "Control Fairy's audio and music playback engine. "
+            "Allows searching and streaming songs via YouTube, queuing tracks, toggling playback "
+            "(pause, resume, next, prev), adjusting volume and playback speed, managing favorites, "
+            "and saving playlists."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["launch", "close"],
-                    "description": "'launch' to start an application, or 'close' to terminate its processes."
+                    "enum": [
+                        "play",
+                        "add_queue",
+                        "pause",
+                        "resume",
+                        "next",
+                        "prev",
+                        "set_volume",
+                        "set_speed",
+                        "toggle_favorite",
+                        "save_playlist",
+                    ],
+                    "description": (
+                        "The specific playback operation to perform. "
+                        "Use 'play' to find and play a new track immediately, "
+                        "'add_queue' to append a song to the current playlist, "
+                        "'pause', 'resume', 'next', 'prev' for player navigation, "
+                        "'set_volume' or 'set_speed' to adjust audio output, "
+                        "'toggle_favorite' to add/remove the current track from favorites, "
+                        "or 'save_playlist' to persist the current queue."
+                    ),
                 },
-                "app_name": {
+                "query": {
                     "type": "string",
                     "description": (
-                        "Common name, alias, or executable file name of the application "
-                        "(e.g., 'vscode', 'maya', 'blender', 'chrome', 'unreal', 'notepad')."
-                    )
-                },
-                "force": {
-                    "type": "boolean",
-                    "description": (
-                        "Only used when action='close'. Set to true for forceful termination (kill), "
-                        "or false for graceful exit (terminate). Defaults to false."
+                        "Search keywords, song title, artist, or direct YouTube URL. "
+                        "Required when action is 'play' or 'add_queue'. "
+                        "Pass empty string '' for controls that don't need a search query."
                     ),
-                    "default": False
+                },
+                "value": {
+                    "type": "number",
+                    "description": (
+                        "Numeric value for adjustments. "
+                        "When action is 'set_volume': volume level from 0 to 100. "
+                        "When action is 'set_speed': playback speed multiplier (e.g., 0.5, 1.0, 1.25, 1.5, 2.0). "
+                        "Omit or set null for other actions."
+                    ),
+                },
+                "playlist_name": {
+                    "type": "string",
+                    "description": (
+                        "Name of the playlist when action is 'save_playlist'. "
+                        "Defaults to empty string '' if not specified."
+                    ),
+                },
+            },
+            "required": ["action"],
+        },
+    },
+    {
+        "type": "function",
+        "name": "handle_general_memory",
+        "description": (
+            "Manage Master's long-term memory profile. "
+            "Silently use this to 'add' new personal facts, 'update' existing facts when habits change, or 'delete' incorrect memories. "
+            "Always write facts in third-person (e.g., 'Master loves React')."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["add", "update", "delete"],
+                    "description": "The memory operation to perform."
+                },
+                "doc_id": {
+                    "type": "string",
+                    "description": "The unique ID of the memory. Required ONLY for 'update' and 'delete'. Must be extracted from System Prompt context."
+                },
+                "content": {
+                    "type": "string",
+                    "description": "The fact text written in third-person. Required ONLY for 'add' and 'update'."
+                },
+                "category": {
+                    "type": "string",
+                    "description": "Category of the memory (e.g., 'general', 'music', 'work'). Optional, defaults to 'general'. Used only for 'add'."
                 }
             },
-            "required": ["action", "app_name"]
+            "required": ["action"]
         }
     }
 ]
 
 tool_registry = {
 
-    "manage_memory" : manage_memory,
     "get_app_usage_context": app_tracker.get_app_usage_context,
 
     "get_system_telemetry": system_tracker.get_system_telemetry,
@@ -335,6 +318,8 @@ tool_registry = {
 
     "execute_terminal_command":(execute_terminal_command),
 
-    "play_music":(play_music)
+    "manage_playback":(manage_playback),
+    "handle_general_memory": (handle_general_memory)
+    
 
 }

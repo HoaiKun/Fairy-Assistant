@@ -3,13 +3,16 @@ import base64
 from contextlib import asynccontextmanager
 import json
 import re
-
+from fastapi.responses import StreamingResponse
+import httpx
+from urllib.parse import unquote
 from Brain.CoreBrain import RunFairyMain
 from Brain.STT_Handler import transcribe_audio_base64
 from Brain.TTS_Handler import generate_fish_audio_bytes
 from extensions.reminder_manager import reminder_manager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import httpx
+from fastapi.middleware.cors import CORSMiddleware
 
 http_client = httpx.AsyncClient(timeout=15.0)
 PUNCTUATION_PATTERN = re.compile(r"([.!?;:\n]+)")
@@ -32,6 +35,13 @@ app = FastAPI(lifespan=lifespan)
 # Tập hợp lưu các client đang online (để bắn thông báo)
 active_connections: set[asyncio.Queue] = set()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Cho phép tất cả origin kể cả localhost:1420 của Tauri/Vite
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def RaiseReminder(item: dict):
   global main_loop
@@ -196,14 +206,14 @@ async def chat_endpoint(websocket: WebSocket):
           # 1. Gửi delta text tức thì lên UI
           await websocket.send_text(
               json.dumps(
-                  {"role": "bot", "type": "text_delta", "content": chunk},
+                  chunk,
                   ensure_ascii=False,
               )
           )
 
           # 2. Gom câu nếu bật voice
           if IsVoice:
-            sentence_buffer += chunk
+            sentence_buffer += chunk.get("content") or ""
 
             should_cut = False
             if is_first_sentence:
@@ -269,3 +279,24 @@ async def chat_endpoint(websocket: WebSocket):
   finally:
     active_connections.discard(user_queue)
     print("Disconnected Client")
+
+
+@app.get("/api/stream_music")
+async def proxy_stream_music(url: str):
+    target_url = unquote(url)
+    
+    async def audio_stream_generator():
+        async with httpx.AsyncClient() as client:
+            async with client.stream("GET", target_url) as response:
+                async for chunk in response.aiter_bytes(chunk_size=8192):
+                    yield chunk
+
+    # Header CORS này chính là "chìa khóa" để thẻ <audio> ở Frontend vẽ được sóng âm
+    return StreamingResponse(
+        audio_stream_generator(), 
+        media_type="audio/mp4",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "no-cache",
+        }
+    )

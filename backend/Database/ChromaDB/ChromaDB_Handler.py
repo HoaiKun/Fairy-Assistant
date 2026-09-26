@@ -1,44 +1,61 @@
-import uuid
-from datetime import datetime
-from Database.ChromaDB.ChromaDBMain import memory_collection
+from langchain_core.tools import tool
+from Database.ChromaDB.ChromaDBMain import insert_memory, update_memory_doc, delete_memory_doc
 
-def save_memory(content:str, category:str = "general", metadata_extra: dict = None):
-    doc_id = str(uuid.uuid4())
-    now_iso = datetime.now().isoformat()
+@tool
+def memorize_fact(content: str, category: str = "general") -> str:
+    """
+    QUIETLY INVOKE THIS TOOL to record new details whenever Master reveals preferences, habits, work, musical tastes, or personal facts.
+    You MUST save the information in the third person.
+    Examples: "Master loves listening to Youngcaptain", "Master works as a Python Developer".
+    """
+    doc_id = insert_memory(content, category)
+    return f"[Memory Saved] ID: {doc_id}"
 
-    meta = {
-        "timestamp":now_iso,
-        "category" : category
-    }
+@tool
+def update_fact(doc_id: str, new_content: str) -> str:
+    """
+    SILENTLY CALL THIS TOOL to modify/overwrite an OLD memory when the Master changes a habit.
+    The doc_id must be retrieved from the 'Master's Context' section of the System Prompt.
+    Example: The Master used to prefer React but has now switched to Tauri.
+    """
+    update_memory_doc(doc_id, new_content)
+    return f"[Memory Updated] ID: {doc_id}"
 
-    if metadata_extra:
-        meta.update(metadata_extra)
+@tool
+def forget_fact(doc_id: str) -> str:
+    """
+    Silently invoke this tool to delete a memory if the Master requests to "forget it" or if the information is no longer accurate.
+    """
+    delete_memory_doc(doc_id)
+    return f"[Memory Deleted] ID: {doc_id}"
 
-    memory_collection.add(
-        ids = [doc_id],
-        documents=[content],
-        metadatas=[meta]
-    )
-    return doc_id
+# Đóng gói danh sách Tools để export
+FAIRY_MEMORY_TOOLS = [memorize_fact, update_fact, forget_fact]
 
-def search_memory(query:str, limit: int  = 10):
-    results = memory_collection.query(
-        query_texts=[query],
-        n_results=limit
-    )
 
-    docs = results.get("documents", [[]])[0]
-    metas = results.get("metadatas", [[]])[0]
-    distances = results.get("distances", [[]])[0]
 
-    formatted_resuls = []
+async def handle_general_memory(action: str, doc_id: str = None, content: str = None, category: str = "general") -> dict:
+    try:
+        if action == "add":
+            if not content:
+                return {"success": False, "error": "Missing content for add action"}
+            new_id = insert_memory(content, category)
+            return {"success": True, "action": "add", "doc_id": new_id}
+            
+        elif action == "update":
+            if not doc_id or not content:
+                return {"success": False, "error": "Missing doc_id or content for update action"}
+            update_memory_doc(doc_id, content, category)
+            return {"success": True, "action": "update", "doc_id": doc_id}
+            
+        elif action == "delete":
+            if not doc_id:
+                return {"success": False, "error": "Missing doc_id for delete action"}
+            delete_memory_doc(doc_id)
+            return {"success": True, "action": "delete", "doc_id": doc_id}
+            
+        return {"success": False, "error": "Invalid action"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
-    for doc, meta, dist in zip(docs, metas, distances):
-        formatted_resuls.append({
-            "content":   doc,
-            "timestamp": meta.get("timestamp"),
-            "category" : meta.get("category"),
-            "relevance_score" : round(1-dist, 3) if dist is not None else 1.0
-        }
-        )
-    return formatted_resuls
+
