@@ -6,7 +6,7 @@ import re
 from fastapi.responses import StreamingResponse
 import httpx
 from urllib.parse import unquote
-from Brain.CoreBrain import RunFairyMain
+from Brain.CoreBrain import RunFairyMain, CleanUpUnsavedMemory
 from Brain.STT_Handler import transcribe_audio_base64
 from Brain.TTS_Handler import generate_fish_audio_bytes
 from extensions.reminder_manager import reminder_manager
@@ -25,6 +25,7 @@ main_loop = None
 async def lifespan(app: FastAPI):
   global main_loop
   main_loop = asyncio.get_running_loop()
+  asyncio.create_task(CleanUpUnsavedMemory())
   print(f"[Fairy Server] Main Event Loop captured: {main_loop}")
   yield
   await http_client.aclose()

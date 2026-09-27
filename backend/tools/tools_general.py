@@ -10,7 +10,7 @@ from Database.ChromaDB.ChromaDB_Handler import handle_general_memory
 tools_schema = [
     # 1. Built-in tools
     {"type": "web_search_preview"},
-    # 2. Custom tools (Flattened for Responses API)
+    {"type": "computer"},
 
     {
         "type": "function",

@@ -10,6 +10,7 @@ import json
 from pydantic import BaseModel
 import inspect
 from Database.SQLDB.Database_Manager import db_manager
+from tools.computer_use import execute_computer_action, capture_screen_base64
 load_dotenv()
 
 FairyMain = AsyncOpenAI()
@@ -19,6 +20,33 @@ tools = tools_schema
 latest_response_id = None
 
 ChatHistoryStorage = []
+ChatDetailArray = []
+
+CHAT_LENGTH_SAVE_LIMIT = 10
+
+async def CleanUpUnsavedMemory():
+  UnSavedMem = await db_manager.get_unprocessed_rag_chats()
+
+  if not UnSavedMem:
+    return
+
+  ConvertDict = [{k: v for k, v in item.items() if k != "id"} for item in UnSavedMem]
+  ids = [item["id"] for item in UnSavedMem if "id" in item]
+
+  try:
+    # 1. Chờ xử lý xong và lưu thành công vào ChromaDB
+    await execute_save_memory(messages=ConvertDict)
+
+    # 2. Lưu thành công mới đánh dấu đã xử lý trong SQL DB
+    if hasattr(db_manager.mark_rag_processed, "__await__") or inspect.iscoroutinefunction(db_manager.mark_rag_processed):
+      await db_manager.mark_rag_processed(ids)
+    else:
+      await asyncio.to_thread(db_manager.mark_rag_processed, ids)
+
+    print(f"[CLEANUP] Đã đồng bộ thành công {len(ids)} tin nhắn cũ vào bộ nhớ.")
+  except Exception as e:
+    print(f"[CLEANUP ERROR] Lỗi khi dọn dẹp bộ nhớ chưa lưu: {e}", flush=True)
+
 
 
 class ChatSchema(BaseModel):
@@ -90,7 +118,7 @@ MASTER_GENERAL_CONTEXT = GetGeneralMemories()
 FULL_INSTRUCTION = BASE_INSTRUCTION + MASTER_GENERAL_CONTEXT
 
 
-async def RunFairyMain(input: str, model = "gpt-4o-mini", role= "user", session = "00000000-0000-0000-0000-000000000000",  max_steps = 1, type="chat"):
+async def RunFairyMain(input: str | list , model = "gpt-5.6-luna", role= "user", session = "00000000-0000-0000-0000-000000000000",  max_steps = 20, type="chat"):
 
     if session is None:
         session = await db_manager.create_chat_session(topic=f"Session {datetime.now().date()}")
@@ -125,8 +153,13 @@ async def RunFairyMain(input: str, model = "gpt-4o-mini", role= "user", session 
         role="user", 
         msg_type="chat", 
         content=input
-    )
-)
+
+        
+    ))
+
+    if type == "chat" and role == "user":
+        ChatDetailArray.append({"role" : role, "content":input})
+
         
     if tools:
         request_response_params["tools"] = tools
@@ -137,10 +170,12 @@ async def RunFairyMain(input: str, model = "gpt-4o-mini", role= "user", session 
     )
 
     pending_function_calls = []
-
+    pending_computer_calls = []
     full_sentence = ""
 
     async for item in FairyResponse:
+
+
 
         if item.type == "response.created":
             latest_response_id = item.response.id
@@ -165,6 +200,8 @@ async def RunFairyMain(input: str, model = "gpt-4o-mini", role= "user", session 
 
             elif getattr(output_item, "type", None) == "code_interpreter_call":
                 print(f"\n[Processing...]", flush=True)
+            elif getattr(output_item, "type", None) == "computer_call":
+                pending_computer_calls.append(output_item)
         elif item.type == "response.completed":
             latest_response_id = item.response.id
 
@@ -174,7 +211,7 @@ async def RunFairyMain(input: str, model = "gpt-4o-mini", role= "user", session 
             "content":full_sentence.strip()
         })
 
-        if(type == "prompt"):
+        if(type == "chat"):
             asyncio.create_task(
             db_manager.save_chat_detail(
                 session_id=session, 
@@ -183,7 +220,68 @@ async def RunFairyMain(input: str, model = "gpt-4o-mini", role= "user", session 
                 content=full_sentence.strip()
             )
         )
+        if type == "chat":
+            ChatDetailArray.append({"role" : "assistant", "content":full_sentence.strip()})
 
+
+    if len(ChatDetailArray) >= CHAT_LENGTH_SAVE_LIMIT:
+        messages_to_save = list(ChatDetailArray[:CHAT_LENGTH_SAVE_LIMIT])
+
+        del ChatDetailArray[:CHAT_LENGTH_SAVE_LIMIT]
+
+        asyncio.create_task(execute_save_memory(messages=messages_to_save, session=session))
+
+
+    if pending_computer_calls:
+        computer_outputs = []
+        
+        for call in pending_computer_calls:
+            print("\n[Executing OS Actions...]", flush=True)
+            
+            # Lấy list actions an toàn từ object hoặc dict
+            actions = getattr(call, "actions", call.get("actions") if isinstance(call, dict) else [])
+            
+            for action in actions:
+                await asyncio.to_thread(execute_computer_action, action)
+
+            # Đợi UI load và chụp ảnh báo cáo
+            await asyncio.sleep(1.0)
+            screenshot = await asyncio.to_thread(capture_screen_base64)
+            
+            call_id = getattr(call, "call_id", None)
+
+            if not call_id and isinstance(call, dict):
+                call_id = call.get("call_id")
+
+            if not call_id:
+                raise RuntimeError(f"Computer call không có call_id: {call}")
+            
+            computer_outputs.append({
+                "type": "computer_call_output",
+                "call_id": call_id,
+                "output": {
+                    "type": "computer_screenshot",
+                    "image_url": f"data:image/jpeg;base64,{screenshot}"
+                }
+            })
+            
+            yield {
+                "role": "bot",
+                "type": "execute_tool",
+                "data": f"Executed {len(actions)} actions",
+                "tool_name": "computer"
+            }
+
+        # Đệ quy trả kết quả màn hình cho model tiếp tục suy luận
+        async for sub_chunk in RunFairyMain(
+            input=computer_outputs,
+            model=model,
+            role="assistant",
+            max_steps=max_steps - 1,
+            type="computer_call",
+            session=session
+        ):
+            yield sub_chunk
 
     if pending_function_calls:
         tools_output = []
@@ -228,14 +326,9 @@ async def RunFairyMain(input: str, model = "gpt-4o-mini", role= "user", session 
             yield sub_chunk
 
 
-import json
-import asyncio
-from Database.ChromaDB.ChromaDBMain import insert_memory, search_memory, update_memory_doc
-
-async def execute_save_memory(messages):
-    # Lấy 6 tin nhắn gần nhất (khoảng 3 lượt trao đổi qua lại) để lấy ngữ cảnh đầy đủ
-    # Giúp LLM hiểu rõ User đang trả lời cho câu hỏi nào của Bot mà vẫn tiết kiệm Token
-    recent_messages = messages[-1:]
+async def execute_save_memory(messages, session = ""):
+    
+    recent_messages = messages[-10:]
     input_text = json.dumps(recent_messages, ensure_ascii=False, indent=2)
 
     # ==========================================
