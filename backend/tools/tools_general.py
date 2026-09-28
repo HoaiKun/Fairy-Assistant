@@ -1,48 +1,55 @@
 import json
 from extensions.app_tracking import app_tracker 
 from extensions.system_tracking import system_tracker
-from tools.control_system import control_system
 from tools.manage_schedule import manage_schedule
 from tools.execute_terminal import execute_terminal_command
-from tools.manage_app import manage_application
 from tools.music_tool import manage_playback
-from Database.ChromaDB.ChromaDB_Handler import handle_general_memory
+from Database.ChromaDB.ChromaDB_Handler import get_long_term_memories
 tools_schema = [
     # 1. Built-in tools
     {"type": "web_search_preview"},
-    {"type": "computer"},
-
     {
         "type": "function",
-        "name": "get_dynamic_memories",
+        "name": "get_long_term_memories",
         "description": (
-            "Retrieve relevant long-term memories, user background facts, or"
-            " contextual profile information based on a semantic search query."
-            " Incorporate multi-turn conversational context rather than just"
-            " individual keywords."
+            "Retrieve Master's long-term facts, preferences, background history"
+            "or project stacks from ChromaDB. Use focused search terms without conversational fluff."
+            "Must use when missing or forgetting facts about user/master"
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "search_query": {
                     "type": "string",
-                    "description": (
-                        "A natural language semantic query representing the"
-                        " target memory (e.g., 'class schedule', 'sleep"
-                        " habits', 'ongoing projects', 'workout routine')."
-                    ),
+                    "description": "Dense keyword or key semantic phrase (e.g., 'favorite music genre', 'RTX graphics card')."
+                },
+                "category": {
+                    "type": "string",
+                    "enum": ["all", "tech", "work", "personal", "gaming", "music"],
+                    "description": "Optional domain filter. Defaults to 'all'."
                 },
                 "limit": {
                     "type": "integer",
-                    "description": (
-                        "Maximum number of relevant memory entries to retrieve."
-                        " Defaults to 5."
-                    ),
-                    "default": 5,
-                },
+                    "description": "Max entries to return. Defaults to 5."
+                }
             },
-            "required": ["search_query"],
-        },
+            "required": ["search_query"]
+        }
+    },
+    {
+        "type": "function",
+        "name": "forget_user_fact",
+        "description": "Invoke ONLY when the user explicitly commands to forget, wipe, or remove a known fact.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "description": "Topic or keyword describing the memory to wipe."
+                }
+            },
+            "required": ["topic"]
+        }
     },
     {
         "type": "function",
@@ -96,43 +103,6 @@ tools_schema = [
             },
             "required": ["target"]
         }
-    },
-    {
-        "type": "function",
-        "name": "control_system",
-        "description": (
-            "Execute Windows system controls and timed power actions. "
-            "Supports scheduling shutdown or restart (e.g., 'in 30 minutes', '1 hour'), "
-            "canceling scheduled shutdowns, locking workstation, sleeping, and volume controls."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string",
-                    "enum": [
-                        "shutdown",
-                        "restart",
-                        "cancel_shutdown",
-                        "lock",
-                        "sleep",
-                        "volume_up",
-                        "volume_down",
-                        "mute_toggle",
-                    ],
-                    "description": "The system operation to perform.",
-                },
-                "value": {
-                    "type": "string",
-                    "description": (
-                        "Optional duration for shutdown/restart (e.g., '30m', '1"
-                        " tiếng', '45 phút', '3600') or number of volume steps"
-                        " (e.g., '5', '10')."
-                    ),
-                },
-            },
-            "required": ["action"],
-        },
     },
     {
         "type": "function",
@@ -270,38 +240,12 @@ tools_schema = [
             "required": ["action"],
         },
     },
+]
+
+advance_tool_schema = [
     {
-        "type": "function",
-        "name": "handle_general_memory",
-        "description": (
-            "Manage Master's long-term memory profile. "
-            "Silently use this to 'add' new personal facts, 'update' existing facts when habits change, or 'delete' incorrect memories. "
-            "Always write facts in third-person (e.g., 'Master loves React')."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string",
-                    "enum": ["add", "update", "delete"],
-                    "description": "The memory operation to perform."
-                },
-                "doc_id": {
-                    "type": "string",
-                    "description": "The unique ID of the memory. Required ONLY for 'update' and 'delete'. Must be extracted from System Prompt context."
-                },
-                "content": {
-                    "type": "string",
-                    "description": "The fact text written in third-person. Required ONLY for 'add' and 'update'."
-                },
-                "category": {
-                    "type": "string",
-                    "description": "Category of the memory (e.g., 'general', 'music', 'work'). Optional, defaults to 'general'. Used only for 'add'."
-                }
-            },
-            "required": ["action"]
-        }
-    }
+    "type":"computer"
+}
 ]
 
 tool_registry = {
@@ -310,16 +254,12 @@ tool_registry = {
 
     "get_system_telemetry": system_tracker.get_system_telemetry,
 
-    "manage_application": manage_application,
-
-    "control_system":(control_system),
-
     "manage_schedule":(manage_schedule),
 
     "execute_terminal_command":(execute_terminal_command),
 
     "manage_playback":(manage_playback),
-    "handle_general_memory": (handle_general_memory)
+    "get_long_term_memories": (get_long_term_memories)
     
 
 }

@@ -30,11 +30,7 @@ SCREEN_WIDTH, SCREEN_HEIGHT = pyautogui.size()
 # ==========================================
 # Khai báo trực tiếp loại tool "computer_use" theo chuẩn built-in
 computer_tool_schema = {
-    "type": "computer_use",
-    "computer_use": {
-        "display_width_px": SCREEN_WIDTH,
-        "display_height_px": SCREEN_HEIGHT
-    }
+    "type":"computer"
 }
 
 

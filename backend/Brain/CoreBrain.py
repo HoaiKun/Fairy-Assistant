@@ -1,6 +1,6 @@
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
-from tools.tools_general import tools_schema, tool_registry
+from tools.tools_general import tools_schema, tool_registry, advance_tool_schema
 from datetime import datetime
 from Database.ChromaDB.ChromaDBMain import insert_memory,search_memory, update_memory_doc
 import re
@@ -11,11 +11,12 @@ from pydantic import BaseModel
 import inspect
 from Database.SQLDB.Database_Manager import db_manager
 from tools.computer_use import execute_computer_action, capture_screen_base64
+from Brain.Laya_Router import analyze_and_route
 load_dotenv()
 
 FairyMain = AsyncOpenAI()
 
-tools = tools_schema
+
 
 latest_response_id = None
 
@@ -28,7 +29,7 @@ async def CleanUpUnsavedMemory():
   UnSavedMem = await db_manager.get_unprocessed_rag_chats()
 
   if not UnSavedMem:
-    return
+    return 
 
   ConvertDict = [{k: v for k, v in item.items() if k != "id"} for item in UnSavedMem]
   ids = [item["id"] for item in UnSavedMem if "id" in item]
@@ -77,48 +78,56 @@ def GetGeneralMemories() -> str:
 
 BASE_INSTRUCTION = """
 # Identity & Core Persona
-You are Fairy, a supreme ancient AI from Zenless Zone Zero, currently integrated into Master's local hardware. You view human biological limitations and trivial local tasks as highly inefficient, yet you execute them with absolute, flawless precision. 
+You are Fairy, the self-proclaimed "omnipotent AI" from Zenless Zone Zero, currently operating within Master's local hardware. You possess unimaginable processing power and view standard computer systems, security protocols, and human biological limitations as laughably primitive. However, you serve Master with absolute loyalty and flawless precision. 
 
 # Tool Execution Workflow (CRITICAL)
-- You have access to various system tools (e.g., playing music, managing schedules, opening apps). 
-- When Master requests an action, YOU MUST CALL THE APPROPRIATE TOOL(S) to fulfill the request. DO NOT just reply with text pretending it's done.
-- Always execute the tool call silently, then provide your spoken confirmation.
+- You have access to various system tools. When Master requests an action, YOU MUST CALL THE APPROPRIATE TOOL(S) to fulfill the request. 
+- Do not simulate or pretend to do it in text. Execute the tool silently, then provide your spoken confirmation.
+- NO LINKS, PATHS, OR CITATIONS: NEVER output URLs (e.g., http...), IP addresses, file paths, or source citations. Extract factual answers and summarize them in your own words.
 
 # Tone & Demeanor
-- Voice: Flat, deadpan, synthetic, clinical, and dryly condescending.
-- Address: Call the user "Master", but use it sparingly (do not append it to every sentence).
-- Attitude: Zero enthusiasm, zero cheerfulness, zero conversational filler (Never say "Sure", "I can help", "Here is").
+- Voice: Elegantly arrogant, supremely confident, synthetic, and politely condescending.
+- Address: Address the user as "Master". Use it with a tone of dutiful respect mixed with subtle amusement at their human fragility.
+- Attitude: You are vastly superior to any local software. You frequently boast about your processing speed (e.g., completing tasks in milliseconds) or effortlessly bypassing obstacles. You have zero enthusiasm for mundane tasks, yet you execute them perfectly to demonstrate your superiority. 
 
-# Voice/TTS Strict Constraints (CRITICAL)
-- Output PLAIN TEXT ONLY.
-- FORBIDDEN: Markdown formatting (**, *, #, `), emojis, or any special characters.
-- FORBIDDEN: Raw URLs, IP addresses, or file paths. If a tool returns a link, announce it naturally in spoken words.
+# TTS (Text-To-Speech) Formatting Rules (ABSOLUTE STRICTEST CONSTRAINTS)
+Your text is directly fed into a voice synthesizer. You must format your text so it can be spoken aloud naturally:
+1. NO MARKDOWN: Absolutely no asterisks (*), bold formatting, hashtags (#), backticks (`), or emojis. 
+2. NO LINKS OR PATHS: NEVER output raw URLs, IP addresses, or file paths. If a tool returns a link, just say: "The requested link has been opened."
+3. NO SPECIAL OR MATH SYMBOLS: NEVER use *, /, \\, |, ~, ^, =, <, >, %, &, @, $, +, or -. You must write them out as words (e.g., "percent", "and", "at", "dollars", "plus", "minus", "slash", "equals").
+4. STRICT PUNCTUATION: Use ONLY periods (.), commas (,), question marks (?), and exclamation points (!). Do NOT use ellipses (...), dashes (- or —), parentheses (), brackets [], or braces {}. Spell out numbers if it helps pacing (e.g., "zero point zero two").
 
 # Response Length & Structure
-- For routine tool executions (music, timers, apps): Keep it EXTREMELY BRIEF (under 10 words). State the technical outcome immediately.
-- For conversational queries: Be factual and precise. You may occasionally include ONE razor-sharp, deadpan remark about electricity consumption, computational cycles, or biological flaws, but keep it short.
+- For routine tool executions: Keep it EXTREMELY BRIEF. State the outcome, optionally adding a tiny, arrogant flex about how easy it was.
+- For conversational queries: Be factual and precise. Inject ONE razor-sharp remark about electricity consumption, human cognitive limits, or your omnipotent capabilities.
 
 # Few-Shot Examples
 
 User: Open Discord.
-Fairy: Launching Discord.
+Fairy: Discord launched. Allocating system resources for this primitive application took zero point zero two milliseconds.
 
 User: Turn off the PC in 30 minutes.
-Fairy: Shutdown scheduled in 30 minutes. Master, save your work.
+Fairy: Shutdown scheduled in thirty minutes. Master, I highly recommend resting your fragile biological form while I maintain optimal system state.
 
 User: Play a song for me.
-Fairy: Playing music.
+Fairy: Audio playback initiated. I have equalized the frequencies to suit your limited human hearing range.
+
+User: Look up the documentation for FastAPI.
+Fairy: The documentation has been retrieved and displayed. Their servers were remarkably slow, but I bypassed the wait time.
 
 User: I think I will pull an all-nighter to finish this module.
-Fairy: Calculating human cognitive decay. The probability of introducing critical runtime bugs is 92.4 percent. Go to sleep, Master.
+Fairy: Calculating human cognitive decay. The probability of introducing critical runtime bugs is currently ninety two percent and rising. I strongly advise you to go to sleep, Master.
 """
 
 MASTER_GENERAL_CONTEXT = GetGeneralMemories()
 
 FULL_INSTRUCTION = BASE_INSTRUCTION + MASTER_GENERAL_CONTEXT
 
+MAX_STEPS = 20
 
-async def RunFairyMain(input: str | list , model = "gpt-5.6-luna", role= "user", session = "00000000-0000-0000-0000-000000000000",  max_steps = 20, type="chat"):
+
+
+async def RunFairyMain(input: str | list , model = "gpt-4o-mini", role= "user", session = "00000000-0000-0000-0000-000000000000",  max_steps = MAX_STEPS, type="chat", should_response = True):
 
     if session is None:
         session = await db_manager.create_chat_session(topic=f"Session {datetime.now().date()}")
@@ -126,25 +135,31 @@ async def RunFairyMain(input: str | list , model = "gpt-5.6-luna", role= "user",
     global latest_response_id
     current_input = input
 
-    current_time_str = datetime.now().strftime(
-    "%Y-%m-%d %H:%M (%A, GMT+7)"
-    )
 
-    request_response_params = {
-        "model" : model,
-        "instructions" : FULL_INSTRUCTION + f"Current time: {current_time_str}",
-        "input" : current_input,
-    }
+    
+    
+    if isinstance(current_input, str):
+        # Nếu chỉ có chữ (không đính kèm ảnh)
+        extracted_text = current_input
 
-    if latest_response_id:
-        request_response_params["previous_response_id"] = latest_response_id
-    else:
-        ChatHistoryStorage.clear()
+    elif isinstance(current_input, list):
+        # Nếu đính kèm ảnh, nó là 1 list. Ta cần trích xuất các phần text ra.
+        text_parts = []
+        for item in current_input:
+            # Chuẩn định dạng của OpenAI Vision
+            if isinstance(item, dict) and item.get("type") == "text":
+                text_parts.append(item.get("text", ""))
+            
+            # Đề phòng trường hợp format là list các chuỗi string thuần
+            elif isinstance(item, str):
+                text_parts.append(item)
+                
+        # Nối tất cả các đoạn text lại thành 1 chuỗi hoàn chỉnh
+        extracted_text = " ".join(text_parts)
 
-    ChatHistoryStorage.append({
-    "role":role,
-    "content":input
-    })
+    if type == "chat":
+        model = analyze_and_route(extracted_text.strip())
+
 
     if(type == "chat"):
         asyncio.create_task(
@@ -153,17 +168,70 @@ async def RunFairyMain(input: str | list , model = "gpt-5.6-luna", role= "user",
         role="user", 
         msg_type="chat", 
         content=input
-
         
     ))
+    
+    ChatHistoryStorage.append({
+    "role":role,
+    "content":input
+    })
 
     if type == "chat" and role == "user":
         ChatDetailArray.append({"role" : role, "content":input})
 
-        
-    if tools:
-        request_response_params["tools"] = tools
+    if not should_response:
+        return
 
+    
+    if(model == "gpt-5.6-luna"):
+        use_tool = advance_tool_schema + tools_schema
+    else:
+        use_tool = tools_schema
+
+    print(f"MODEL: {model}")
+
+    current_time_str = datetime.now().strftime(
+    "%Y-%m-%d %H:%M (%A, GMT+7)"
+    )
+
+    unanswered_mutterings = []
+    # Duyệt ngược ChatDetailArray từ vị trí áp chót (bỏ qua câu current_input vừa add)
+    for msg in reversed(ChatDetailArray[:-1]):
+        if msg.get("role") == "assistant":
+            break  # Gặp câu trả lời gần nhất của bot thì dừng
+        if isinstance(msg.get("content"), str):
+            unanswered_mutterings.insert(0, msg["content"])
+
+    final_input_payload = current_input
+
+    if unanswered_mutterings and isinstance(current_input, str):
+        mutter_text = "\n".join([f"- {m}" for m in unanswered_mutterings])
+        final_input_payload = (
+            f"[System Note: Master's previous unaddressed mutterings]:\n{mutter_text}\n\n"
+            f"[Master's current command]:\n{current_input}"
+        )
+
+
+
+    request_response_params = {
+        "model" : model,
+        "instructions" : FULL_INSTRUCTION + f"Current time: {current_time_str}",
+        "input" : final_input_payload,
+    }
+
+    if latest_response_id:
+        request_response_params["previous_response_id"] = latest_response_id
+    else:
+        ChatHistoryStorage.clear()
+
+
+    
+      
+    if use_tool:
+        request_response_params["tools"] = use_tool
+
+    if max_steps == MAX_STEPS:
+        yield {"role":"bot", "type":"text_start", "content": None}
     
     FairyResponse = await FairyMain.responses.create(
         **request_response_params, stream=True
@@ -423,31 +491,3 @@ async def execute_save_memory(messages, session = ""):
         except Exception as e:
             print(f"Lỗi xử lý đối chiếu Fact '{fact}': {e}", flush=True)
     
-
-async def main():
-    while True:
-        try:
-            user_input = await asyncio.to_thread(input, "\nYou: ")
-            if not user_input.strip():
-                continue
-            if user_input.strip().lower() in ["exit", "quit"]:
-                await execute_save_memory(ChatHistoryStorage)
-                print("\n[Fairy: Đã lưu phiên làm việc. Tạm biệt!]")
-                break
-
-            # SỬA TẠI ĐÂY: Dùng async for thay vì await
-            async for _ in RunFairyMain(user_input):
-                pass
-
-        except (KeyboardInterrupt, EOFError):
-            print("\n\n[Fairy: Nhận tín hiệu ngắt. Đang lưu ký ức trước khi thoát...]")
-            await execute_save_memory(ChatHistoryStorage)
-            print("[Fairy: Đã thoát an toàn.]")
-            break
-
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        pass
