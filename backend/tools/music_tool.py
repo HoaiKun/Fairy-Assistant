@@ -15,7 +15,10 @@ YDL_OPTS = {
 
 
 def _extract_track_sync(query: str) -> Optional[Dict[str, Any]]:
-    with YoutubeDL(YDL_OPTS) as ydl:
+    # Cập nhật tùy chọn YoutubeDL với trình duyệt được chỉ định
+    ydl_opts = YDL_OPTS.copy()
+
+    with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(query, download=False)
         if not info:
             return None
@@ -42,13 +45,14 @@ async def manage_playback(
     action: str,
     query: str = "",
     value: Optional[float] = None,
-    playlist_name: str = ""
+    playlist_name: str = "",
 ) -> Dict[str, Any]:
     """
     Tool điều khiển âm nhạc & trình phát cho Fairy.
     action: 'play', 'add_queue', 'pause', 'resume', 'next', 'prev', 
             'set_volume', 'set_speed', 'toggle_favorite', 'save_playlist'
-    """
+    """,
+    
     action = action.lower().strip()
 
     try:

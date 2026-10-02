@@ -250,16 +250,14 @@ advance_tool_schema = [
 
 tool_registry = {
 
-    "get_app_usage_context": app_tracker.get_app_usage_context,
+    "get_app_usage_context": {"function": app_tracker.get_app_usage_context, "reasoning_effort":"low"},
 
-    "get_system_telemetry": system_tracker.get_system_telemetry,
+    "get_system_telemetry": {"function": system_tracker.get_system_telemetry, "reasoning_effort":"low"},
 
-    "manage_schedule":(manage_schedule),
+    "manage_schedule": {"function": manage_schedule, "reasoning_effort":"low"},
 
-    "execute_terminal_command":(execute_terminal_command),
+    "execute_terminal_command": {"function": execute_terminal_command, "reasoning_effort":"low"},
 
-    "manage_playback":(manage_playback),
-    "get_long_term_memories": (get_long_term_memories)
-    
-
+    "manage_playback": {"function": manage_playback, "reasoning_effort":"low"},
+    "get_long_term_memories": {"function": get_long_term_memories, "reasoning_effort":"low"}
 }

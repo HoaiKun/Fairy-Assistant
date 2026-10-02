@@ -17,7 +17,7 @@ if sys.platform == "win32":
         os.environ["PATH"] = root + os.pathsep + os.environ["PATH"]
 from faster_whisper import WhisperModel
 
-whisper_model = WhisperModel("small.en", device="cuda", compute_type="float16")
+whisper_model = WhisperModel("small", device="cuda", compute_type="float16")
 
 
 def base64_to_pcm_audio(base64_str: str) -> np.ndarray:
@@ -59,10 +59,11 @@ def transcribe_audio_base64(base64_str: str) -> str:
 
     segments, _ = whisper_model.transcribe(
         audio_np,
-        beam_size=1,
+        beam_size=3,
         best_of=1,
         temperature=0.0,
         condition_on_previous_text=False,
+        vad_filter=True
     )
 
     result_text = "".join([segment.text for segment in segments]).strip()
