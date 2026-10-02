@@ -11,7 +11,7 @@ from pydantic import BaseModel
 import inspect
 from Database.SQLDB.Database_Manager import db_manager
 from tools.computer_use import execute_computer_action, capture_screen_base64
-
+from extensions.pc_listener import FairyEarInstance
 load_dotenv()
 
 FairyMain = AsyncOpenAI()
@@ -22,6 +22,9 @@ unresolved_tool_calls = []
 ChatHistoryStorage = []
 ChatDetailArray = []
 CHAT_LENGTH_SAVE_LIMIT = 10
+
+FairyEarInstance.load_models()
+FairyEarInstance.start()
 
 
 async def CleanUpUnsavedMemory():
@@ -130,8 +133,9 @@ FULL_INSTRUCTION = BASE_INSTRUCTION + MASTER_GENERAL_CONTEXT
 
 MAX_STEPS = 20
 
+MODEL_1 = os.getenv("GPT_MODEL_1", "gpt-6-luna")
 
-async def RunFairyMain(input: str | list , model="gpt-6-luna", role="user", session="00000000-0000-0000-0000-000000000000", max_steps=MAX_STEPS, type="chat", should_response=True, reasoning_effort="low"):
+async def RunFairyMain(input: str | list , model=MODEL_1, role="user", session="00000000-0000-0000-0000-000000000000", max_steps=MAX_STEPS, type="chat", should_response=True, reasoning_effort="low"):
     if session is None:
         session = await db_manager.create_chat_session(topic=f"Session {datetime.now().date()}")
 
@@ -424,7 +428,7 @@ async def execute_save_memory(messages, session=""):
     
     try:
         extract_response = await FairyMain.responses.create(
-            model="gpt-4o-mini",
+            model=MODEL_1,
             instructions=extract_instructions,
             input=input_text
         )

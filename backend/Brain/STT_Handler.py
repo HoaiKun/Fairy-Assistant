@@ -2,11 +2,9 @@ import base64
 import io
 import av
 import numpy as np
-
-
 import os
 import sys
-
+from faster_whisper import WhisperModel
 # Tự động nạp đường dẫn DLL của NVIDIA vào runtime trên Windows
 if sys.platform == "win32":
   cuda_path = os.path.join(sys.prefix, "Lib", "site-packages", "nvidia")
@@ -15,7 +13,7 @@ if sys.platform == "win32":
       if any(f.endswith(".dll") for f in files):
         os.add_dll_directory(root)
         os.environ["PATH"] = root + os.pathsep + os.environ["PATH"]
-from faster_whisper import WhisperModel
+
 
 whisper_model = WhisperModel("small", device="cuda", compute_type="float16")
 
