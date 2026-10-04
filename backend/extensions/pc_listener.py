@@ -18,6 +18,7 @@ class FairyEar:
         # Dùng queue chuẩn của Python (không cần async)
         self.audio_queue = queue.Queue()
         self.current_background_audio = "Silence"
+        self.current_transcripts = ""
         self.recent_transcripts = []
         self.class_names = []
 
@@ -106,8 +107,7 @@ class FairyEar:
                 text = " ".join([segment.text for segment in segments]).strip()
                 
                 if text:
-                    print(f"🔊 [PC Voice ({target_lang})]: {text}")
-                    
+                    self.current_transcripts = text
                     # 2. Lưu vào trí nhớ thụ động (luôn chạy)
                     self.recent_transcripts.append(text)
                     if len(self.recent_transcripts) > 20: self.recent_transcripts.pop(0)
@@ -118,7 +118,11 @@ class FairyEar:
             else:
                 if top_class_name != "Silence":
                     self.current_background_audio = top_class_name
-                    print(f"🔊 [PC Audio : {top_class_name}]")
+
+
+                
+
+            
 
     def start(self):
         """Chạy trực tiếp 2 luồng ngầm (daemon=True nghĩa là nó sẽ tự tắt khi bạn tắt app chính)"""
@@ -127,3 +131,7 @@ class FairyEar:
 
 # Tạo instance sẵn
 FairyEarInstance = FairyEar()
+
+import warnings
+from soundcard import SoundcardRuntimeWarning
+warnings.filterwarnings("ignore", category=SoundcardRuntimeWarning)

@@ -4,7 +4,7 @@ import httpx
 
 FISH_API_KEY = os.getenv("FISH_API_KEY")
 # Reference ID (voice model của Fairy) bạn lấy trên trang console của Fish Audio
-VOICE_REFERENCE_ID = "f8db038da1c34a4c9749f56a1d463fa2"
+VOICE_REFERENCE_ID = os.getenv("VOICE_ID")
 
 
 async def generate_fish_audio_bytes(

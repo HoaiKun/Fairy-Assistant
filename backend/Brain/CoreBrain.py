@@ -2,8 +2,6 @@ from openai import AsyncOpenAI, BadRequestError
 from dotenv import load_dotenv
 from tools.tools_general import tools_schema, tool_registry, advance_tool_schema
 from datetime import datetime
-from Database.ChromaDB.ChromaDBMain import insert_memory, search_memory, update_memory_doc
-import re
 import os
 import asyncio
 import json
@@ -11,6 +9,7 @@ from pydantic import BaseModel
 import inspect
 from Database.SQLDB.Database_Manager import db_manager
 from tools.computer_use import execute_computer_action, capture_screen_base64
+from Database.ChromaDB.ChromaDBMain import retrieve_memory, rerank_memory, extract_memory
 from extensions.pc_listener import FairyEarInstance
 load_dotenv()
 
@@ -60,28 +59,20 @@ def GetGeneralMemories() -> str:
     GeneralKnowledge = ""
     seen_contents = set()  # Dùng set để loại bỏ các fact bị query trùng lặp
 
-    # Chia nhỏ và bổ sung từ khóa để Vector DB đối chiếu chính xác (Cosine Similarity cao hơn)
+    # Chia nhỏ và bổ sung từ khóa để Vector DB đối chiếu chính xác
     General_Query = [
-        # 1. Định danh & Đời sống
         "Master's current living location, hometown, city, and workplace",
         "Master's daily lifestyle routines, sleep schedule, dietary habits, and food preferences",
-        
-        # 2. Học vấn & Chuyên môn
         "Master's occupation, major, university, and current studies",
-        
-        # 3. Môi trường kỹ thuật (SẼ QUÉT RA FIREFOX Ở ĐÂY)
         "Master's technical skills, programming languages, software tools, web browser preferences, and hardware PC specs",
-        
-        # 4. Sở thích giải trí
         "Master's personal hobbies, entertainment, cosplay, favorite video games, anime, and books",
-        
-        # 5. Giao tiếp & Quy tắc tương tác
         "Master's communication preferences, personality traits, and specific instructions on how Fairy should treat Master"
     ]
     
     for query_text in General_Query:
-        # Giảm limit xuống 5 (vì ta có nhiều query hơn) để lọc lấy những fact sát nghĩa nhất
-        query_res = search_memory(query_text, limit=5)
+        # [CẬP NHẬT] Sử dụng Retrieve thô sau đó Rerank để tăng độ chính xác
+        raw_docs = retrieve_memory(query_text, fetch_k=15)
+        query_res = rerank_memory(raw_docs, limit=4, min_final_score=0.35)
         
         for context in query_res:
             content = context.get("content", "").strip()
@@ -125,6 +116,10 @@ Keep sentences concise and easy to pronounce. If the application separates spoke
 
 PRIORITY
 Accuracy and tool execution come first. Follow the immediate conversational context over habitual jokes. Remain recognizably Fairy while responding with natural spontaneity and independent judgment.
+
+RESTRICTIONS
+Never put links or url in your response. Do not output raw code, JSON, or Markdown. Avoid repeating the same phrases or sentences. Do not invent facts, capabilities, or system states. Avoid generic assistant mannerisms and repetitive jokes.
+
 """
 
 MASTER_GENERAL_CONTEXT = GetGeneralMemories()
@@ -135,7 +130,7 @@ MAX_STEPS = 20
 
 MODEL_1 = os.getenv("GPT_MODEL_1", "gpt-6-luna")
 
-async def RunFairyMain(input: str | list , model=MODEL_1, role="user", session="00000000-0000-0000-0000-000000000000", max_steps=MAX_STEPS, type="chat", should_response=True, reasoning_effort="low"):
+async def RunFairyMain(input: str | list , model=MODEL_1, role="user", session="00000000-0000-0000-0000-000000000000", max_steps=MAX_STEPS, type="chat", should_response=True, reasoning_effort="low", temperature = 0.7):
     if session is None:
         session = await db_manager.create_chat_session(topic=f"Session {datetime.now().date()}")
 
@@ -177,9 +172,16 @@ async def RunFairyMain(input: str | list , model=MODEL_1, role="user", session="
     # ==========================================
     # CHUẨN BỊ PAYLOAD PHÂN NHÁNH 
     # ==========================================
+
+    ADDITIONAL_INSTRUCTION = f"""
+    - Current time: {current_time_str}
+    - Current Background Audio: {FairyEarInstance.current_background_audio} | current transcripts: {FairyEarInstance.current_transcripts}
+    """
+
+
     request_params = {
         "model": model,
-        "instructions": FULL_INSTRUCTION + f"Current time: {current_time_str}",
+        "instructions": FULL_INSTRUCTION + ADDITIONAL_INSTRUCTION,
     }
 
     # NHÁNH 1: NẾU LÀ ĐỆ QUY TRẢ KẾT QUẢ TOOL (Giữ nguyên mảng list JSON)
@@ -263,7 +265,7 @@ async def RunFairyMain(input: str | list , model=MODEL_1, role="user", session="
     # ==========================================
     async for item in FairyResponse:
         
-        # Ghi nhận ngay ID khi response bắt đầu để làm cơ sở cho đệ quy tool
+
         if item.type == "response.created":
             latest_response_id = item.response.id
 
@@ -360,7 +362,8 @@ async def RunFairyMain(input: str | list , model=MODEL_1, role="user", session="
             role="assistant",
             max_steps=max_steps - 1,
             type="computer_call",
-            session=session
+            session=session,
+            temperature=temperature
         ):
             yield sub_chunk
 
@@ -415,14 +418,23 @@ async def RunFairyMain(input: str | list , model=MODEL_1, role="user", session="
         yield {"role": "bot", "type": "text_end", "content": None}
 
 
+# ==========================================
+# CẬP NHẬT: QUẢN TRỊ TRÍ NHỚ CHẠY NGẦM
+# ==========================================
 async def execute_save_memory(messages, session=""):
     recent_messages = messages[-10:]
     input_text = json.dumps(recent_messages, ensure_ascii=False, indent=2)
 
+    # [CẬP NHẬT] Prompt nâng cao để LLM tự trích xuất luôn các metadata cần thiết
     extract_instructions = """
     Analyze the conversation and extract durable facts about the user (Master).
     Focus on preferences, routines, profile changes, and interests.
-    Output MUST be valid JSON: {"facts": ["Fact 1", "Fact 2"]}
+    Output MUST be valid JSON: {"facts": [{"content": "...", "category": "...", "importance": 7, "user_relevant": true}]}
+    
+    Allowed categories: personal_profile, tech_and_projects, hobbies_and_entertainment, lifestyle_and_routine, work_and_study, relationships, general.
+    Importance: 1-10 (1-3: trivial/temporary, 4-6: daily facts, 7-8: core habits/likes, 9-10: absolute facts/IDs).
+    user_relevant: true if it describes Master directly, false if it's general knowledge.
+    
     If no durable facts are found, output {"facts": []}.
     """
     
@@ -442,21 +454,35 @@ async def execute_save_memory(messages, session=""):
     if not new_facts:
         return
 
-    for fact in new_facts:
-        if not fact.strip():
+    for fact_obj in new_facts:
+        # Dự phòng trường hợp LLM trả về string thuần tuý thay vì object
+        if isinstance(fact_obj, str):
+            fact_content = fact_obj
+            fact_cat = "general"
+            fact_imp = 5
+            fact_usr = True
+        else:
+            fact_content = fact_obj.get("content", "").strip()
+            fact_cat = fact_obj.get("category", "general")
+            fact_imp = fact_obj.get("importance", 5)
+            fact_usr = fact_obj.get("user_relevant", True)
+
+        if not fact_content:
             continue
             
         try:
-            related_docs = await asyncio.to_thread(search_memory, fact, 2)
+            # [CẬP NHẬT] Sử dụng hàm retrieve & rerank bất đồng bộ (chặn luồng bằng to_thread)
+            raw_related = await asyncio.to_thread(retrieve_memory, fact_content, 10)
+            related_docs = await asyncio.to_thread(rerank_memory, raw_related, None, None, 3, 0.3)
             
             if not related_docs:
-                await asyncio.to_thread(insert_memory, fact, "summary")
-                print(f"[MEMORY ADDED] Mới toanh: {fact}", flush=True)
+                await asyncio.to_thread(extract_memory, fact_content, fact_cat, fact_imp, fact_usr)
+                print(f"[MEMORY ADDED] Mới toanh: {fact_content}", flush=True)
                 continue
 
             resolve_prompt = f"""
             You are a Database Resolution AI. 
-            NEW FACT: "{fact}"
+            NEW FACT: {{"content": "{fact_content}", "category": "{fact_cat}", "importance": {fact_imp}, "user_relevant": {str(fact_usr).lower()}}}
             EXISTING DB RECORDS: {json.dumps(related_docs, ensure_ascii=False)}
             
             Rules:
@@ -465,8 +491,8 @@ async def execute_save_memory(messages, session=""):
             3. If NEW FACT is completely different/additive -> action "ADD".
             
             Output valid JSON only:
-            {{"action": "UPDATE", "doc_id": "<id>", "content": "<merged_or_updated_fact>"}}
-            or {{"action": "ADD", "content": "<fact>"}}
+            {{"action": "UPDATE", "doc_id": "<id>", "content": "<merged_or_updated_fact>", "category": "{fact_cat}", "importance": {fact_imp}, "user_relevant": {str(fact_usr).lower()}}}
+            or {{"action": "ADD", "content": "<fact>", "category": "{fact_cat}", "importance": {fact_imp}, "user_relevant": {str(fact_usr).lower()}}}
             or {{"action": "IGNORE"}}
             """
             
@@ -483,17 +509,25 @@ async def execute_save_memory(messages, session=""):
             if action == "UPDATE":
                 doc_id = decision.get("doc_id")
                 updated_content = decision.get("content")
+                upd_cat = decision.get("category", fact_cat)
+                upd_imp = decision.get("importance", fact_imp)
+                upd_usr = decision.get("user_relevant", fact_usr)
+
                 if doc_id and updated_content:
-                    await asyncio.to_thread(update_memory_doc, doc_id, updated_content, "summary")
+                    await asyncio.to_thread(update_memory, doc_id, updated_content, upd_cat, upd_imp, upd_usr)
                     print(f"[MEMORY UPDATED] ID {doc_id} -> {updated_content}", flush=True)
                     
             elif action == "ADD":
-                content = decision.get("content", fact)
-                await asyncio.to_thread(insert_memory, content, "summary")
-                print(f"[MEMORY ADDED] Khác biệt: {content}", flush=True)
+                add_content = decision.get("content", fact_content)
+                add_cat = decision.get("category", fact_cat)
+                add_imp = decision.get("importance", fact_imp)
+                add_usr = decision.get("user_relevant", fact_usr)
+                
+                await asyncio.to_thread(extract_memory, add_content, add_cat, add_imp, add_usr)
+                print(f"[MEMORY ADDED] Khác biệt: {add_content}", flush=True)
                 
             elif action == "IGNORE":
-                print(f"[MEMORY IGNORED] Đã biết: {fact}", flush=True)
+                print(f"[MEMORY IGNORED] Đã biết: {fact_content}", flush=True)
 
         except Exception as e:
-            print(f"Lỗi xử lý đối chiếu Fact '{fact}': {e}", flush=True)
+            print(f"Lỗi xử lý đối chiếu Fact '{fact_content}': {e}", flush=True)

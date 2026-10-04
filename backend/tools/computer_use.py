@@ -29,10 +29,6 @@ SCREEN_WIDTH, SCREEN_HEIGHT = pyautogui.size()
 # 1. SCHEMA NATIVE TOOL CHO RESPONSES API
 # ==========================================
 # Khai báo trực tiếp loại tool "computer_use" theo chuẩn built-in
-computer_tool_schema = {
-    "type":"computer"
-}
-
 
 # ==========================================
 # 2. XỬ LÝ HÌNH ẢNH (ĐÔI MẮT)

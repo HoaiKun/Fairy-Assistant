@@ -1,68 +1,104 @@
-from langchain_core.tools import tool
-from Database.ChromaDB.ChromaDBMain import insert_memory, update_memory_doc, delete_memory_doc, search_memory
-from typing import List, Dict, Any, Optional
-@tool
-def memorize_fact(content: str, category: str = "general") -> str:
-    """
-    QUIETLY INVOKE THIS TOOL to record new details whenever Master reveals preferences, habits, work, musical tastes, or personal facts.
-    You MUST save the information in the third person.
-    Examples: "Master loves listening to Youngcaptain", "Master works as a Python Developer".
-    """
-    doc_id = insert_memory(content, category)
-    return f"[Memory Saved] ID: {doc_id}"
+from typing import Optional
+from Database.ChromaDB.ChromaDBMain import retrieve_memory, rerank_memory, extract_memory, update_memory, delete_memory
 
-@tool
-def update_fact(doc_id: str, new_content: str) -> str:
-    """
-    SILENTLY CALL THIS TOOL to modify/overwrite an OLD memory when the Master changes a habit.
-    The doc_id must be retrieved from the 'Master's Context' section of the System Prompt.
-    Example: The Master used to prefer React but has now switched to Tauri.
-    """
-    update_memory_doc(doc_id, new_content)
-    return f"[Memory Updated] ID: {doc_id}"
-
-@tool
-def forget_fact(doc_id: str) -> str:
-    """
-    Silently invoke this tool to delete a memory if the Master requests to "forget it" or if the information is no longer accurate.
-    """
-    delete_memory_doc(doc_id)
-    return f"[Memory Deleted] ID: {doc_id}"
-
-# Đóng gói danh sách Tools để export
-FAIRY_MEMORY_TOOLS = [memorize_fact, update_fact, forget_fact]
-
-
-
-def get_long_term_memories(
-    search_query: str, 
-    category: Optional[str] = "all", 
-    limit: int = 5
+def memory_handler(
+    action: str,
+    query: Optional[str] = None,
+    content: Optional[str] = None,
+    doc_id: Optional[str] = None,
+    category: str = "general",
+    importance: int = 5,
+    user_relevant: bool = True,
+    start_time: Optional[float] = None,
+    end_time: Optional[float] = None
 ) -> str:
     """
-    Retrieve user background facts, historical habits, preferences, tech stacks, or past projects.
+    Công cụ ĐA NĂNG để thao tác với bộ nhớ dài hạn của trợ lý. 
+    Hành động (action) quyết định công cụ này sẽ làm gì.
     
     Args:
-        search_query: Concise semantic query focusing on the key topic (e.g., 'favorite framework', 'gym schedule', 'current GPU'). Avoid conversational filler words.
-        category: Filter by specific memory domain: 'tech', 'work', 'personal', 'gaming', 'music', or 'all'. Defaults to 'all'.
-        limit: Number of top memory entries to retrieve (default is 5).
+        action (str): BẮT BUỘC chọn 1 trong: ['search', 'save', 'update', 'delete'].
+        query (str): Cần thiết khi action='search'. Từ khóa tìm kiếm.
+        content (str): Cần thiết khi action='save' hoặc 'update'. Sự thật/nội dung cần ghi (dùng ngôi thứ 3).
+        doc_id (str): Cần thiết khi action='update' hoặc 'delete'. Lấy được ID từ action='search'.
+        category (str): Phân loại. Chọn 1 trong ['personal_profile', 'tech_and_projects', 'hobbies_and_entertainment', 'lifestyle_and_routine', 'work_and_study', 'relationships', 'general'].
+        importance (int): Thang điểm 1-10 về độ quan trọng của trí nhớ.
+        user_relevant (bool): True nếu liên quan trực tiếp đến bản thân người dùng.
+        start_time, end_time (float): UNIX timestamp để khoanh vùng tìm kiếm (chỉ dùng cho 'search').
     """
-    memories = search_memory(
-        query=search_query, 
-        category=None if category == "all" else category, 
-        limit=limit
-    )
+    
+    # -------------------------
+    # 1. TÌM KIẾM (SEARCH)
+    # -------------------------
+    if action == "search":
+        if not query:
+            return "Thất bại: action='search' yêu cầu tham số 'query'."
+        
+        time_range = (start_time, end_time) if start_time and end_time else None
+        
+        # Nếu category là general, coi như không filter khắt khe category để tìm rộng hơn
+        target_cat = category if category != "general" else None 
+        
+        raw_docs = retrieve_memory(query, fetch_k=20)
+        results = rerank_memory(raw_docs, target_category=target_cat, time_range=time_range, limit=5)
+        
+        if not results:
+            return "Không tìm thấy ký ức nào liên quan."
+            
+        formatted_results = []
+        for r in results:
+            time_str = r['timestamp'][:10] # Chỉ lấy YYYY-MM-DD
+            formatted_results.append(f"- [{time_str}] {r['content']} (Score: {r['final_score']} - ID: {r['doc_id']})")
+            
+        return "Ký ức tìm thấy:\n" + "\n".join(formatted_results)
 
-    if not memories:
-        return "No relevant past memories found for this query."
-
-    # Format đầu ra dạng text markdown sạch để LLM hiểu trực tiếp
-    formatted_output = ["### Retrieved Long-Term Memories:"]
-    for idx, mem in enumerate(memories, 1):
-        date_str = mem["timestamp"].split("T")[0] if mem.get("timestamp") else "Unknown date"
-        formatted_output.append(
-            f"{idx}. [{date_str}] ({mem['category']}) {mem['content']}"
+    # -------------------------
+    # 2. LƯU MỚI (SAVE)
+    # -------------------------
+    elif action == "save":
+        if not content:
+            return "Thất bại: action='save' yêu cầu tham số 'content'."
+            
+        new_id = extract_memory(
+            content=content, 
+            category=category, 
+            importance=importance, 
+            user_relevant=user_relevant
         )
+        return f"Đã lưu trí nhớ thành công! [Cat: {category} | Imp: {importance}/10] - ID: {new_id}"
 
-    return "\n".join(formatted_output)
+    # -------------------------
+    # 3. CẬP NHẬT (UPDATE)
+    # -------------------------
+    elif action == "update":
+        if not doc_id or not content:
+            return "Thất bại: action='update' yêu cầu tham số 'doc_id' và 'content' mới."
+            
+        success = update_memory(
+            doc_id=doc_id, 
+            new_content=content, 
+            category=category, 
+            importance=importance, 
+            user_relevant=user_relevant
+        )
+        if success:
+            return f"Đã cập nhật ký ức {doc_id} thành công. Nội dung mới: {content}"
+        return f"Lỗi: Không thể cập nhật ID {doc_id} (có thể ID không tồn tại)."
 
+    # -------------------------
+    # 4. XÓA BỎ (DELETE)
+    # -------------------------
+    elif action == "delete":
+        if not doc_id:
+            return "Thất bại: action='delete' yêu cầu tham số 'doc_id'."
+            
+        success = delete_memory(doc_id)
+        if success:
+            return f"Đã xóa vĩnh viễn ID {doc_id} khỏi hệ thống."
+        return f"Lỗi: Không tìm thấy ID {doc_id} để xóa."
+
+    # -------------------------
+    # ERROR FALLBACK
+    # -------------------------
+    else:
+        return f"Thất bại: Hành động '{action}' không hợp lệ. Chỉ chấp nhận 'search', 'save', 'update', 'delete'."
