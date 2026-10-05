@@ -263,17 +263,30 @@ async def chat_endpoint(websocket: WebSocket):
           IsVoice = data.get("enabled", True)
           continue
 
-        if msg_type == "text" or (
-            "content" in data and not data.get("audio_data")
-        ):
-          content = data.get("content", "").strip()
-          if content:
-            await cancel_ongoing_pipeline()
-            await user_queue.put({
-                "source": "client",
-                "role": "user",
-                "content": content,
-            })
+        if msg_type in ["chat", "text"] or ("content" in data and not data.get("audio_data")):
+          content = data.get("content")
+          role = data.get("role", "user")
+          
+          # Kiểm tra nếu content là chuỗi String đơn thuần (bản cũ)
+          if isinstance(content, str):
+            content_str = content.strip()
+            if content_str:
+              await cancel_ongoing_pipeline()
+              await user_queue.put({
+                  "source": "client",
+                  "role": role,
+                  "content": content_str,
+              })
+              
+          # Kiểm tra nếu content là Mảng (chuẩn mới chứa input_text / input_image)
+          elif isinstance(content, list):
+            if len(content) > 0:
+              await cancel_ongoing_pipeline()
+              await user_queue.put({
+                  "source": "client",
+                  "role": role, 
+                  "content": content,
+              })
 
         elif msg_type == "audio_input":
           base64_audio = data.get("audio_data")

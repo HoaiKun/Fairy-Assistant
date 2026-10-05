@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 import asyncio
 import json
+
 from pydantic import BaseModel
 import inspect
 from Database.SQLDB.Database_Manager import db_manager
@@ -12,6 +13,10 @@ from tools.computer_use import execute_computer_action, capture_screen_base64
 from Database.ChromaDB.ChromaDBMain import retrieve_memory, rerank_memory, extract_memory
 from extensions.pc_listener import FairyEarInstance
 load_dotenv()
+
+
+
+
 
 FairyMain = AsyncOpenAI()
 
@@ -137,16 +142,26 @@ async def RunFairyMain(input: str | list , model=MODEL_1, role="user", session="
     global latest_response_id, unresolved_tool_calls
     current_input = input
 
+    # ==========================================
+    # ĐỒNG BỘ: TRÍCH XUẤT TEXT ĐỂ LƯU DB & RAG
+    # ==========================================
+    extracted_text = ""
     if isinstance(current_input, str):
         extracted_text = current_input
     elif isinstance(current_input, list):
         text_parts = []
         for item in current_input:
-            if isinstance(item, dict) and item.get("type") == "text":
-                text_parts.append(item.get("text", ""))
+            if isinstance(item, dict):
+                item_type = item.get("type")
+                if item_type == "input_text":
+                    text_parts.append(item.get("text", ""))
+                elif item_type == "input_image":
+                    text_parts.append("[Attached Image]")
+                elif item_type == "input_file":
+                    text_parts.append(f"[Attached File: {item.get('filename', 'Unnamed')}]")
             elif isinstance(item, str):
                 text_parts.append(item)
-        extracted_text = " ".join(text_parts)
+        extracted_text = " ".join(text_parts).strip()
 
     # Chỉ ghi log lịch sử nếu là câu chat bình thường
     if type == "chat":
@@ -172,19 +187,17 @@ async def RunFairyMain(input: str | list , model=MODEL_1, role="user", session="
     # ==========================================
     # CHUẨN BỊ PAYLOAD PHÂN NHÁNH 
     # ==========================================
-
     ADDITIONAL_INSTRUCTION = f"""
     - Current time: {current_time_str}
     - Current Background Audio: {FairyEarInstance.current_background_audio} | current transcripts: {FairyEarInstance.current_transcripts}
     """
-
 
     request_params = {
         "model": model,
         "instructions": FULL_INSTRUCTION + ADDITIONAL_INSTRUCTION,
     }
 
-    # NHÁNH 1: NẾU LÀ ĐỆ QUY TRẢ KẾT QUẢ TOOL (Giữ nguyên mảng list JSON)
+    # NHÁNH 1: NẾU LÀ ĐỆ QUY TRẢ KẾT QUẢ TOOL
     if type in ["function_call", "computer_call"]:
         request_params["input"] = current_input
         if latest_response_id:
@@ -199,16 +212,36 @@ async def RunFairyMain(input: str | list , model=MODEL_1, role="user", session="
             if isinstance(msg.get("content"), str):
                 unanswered_mutterings.insert(0, msg["content"])
 
-        final_input_payload = current_input
-        if unanswered_mutterings and isinstance(current_input, str):
-            mutter_text = "\n".join([f"- {m}" for m in unanswered_mutterings])
-            final_input_payload = (
-                f"[System Note: Master's previous unaddressed mutterings]:\n{mutter_text}\n\n"
-                f"[Master's current command]:\n{current_input}"
-            )
+        current_content_payload = []
+        
+        if isinstance(current_input, str):
+            text_val = current_input
+            if unanswered_mutterings:
+                mutter_text = "\n".join([f"- {m}" for m in unanswered_mutterings])
+                text_val = (
+                    f"[System Note: Master's previous unaddressed mutterings]:\n{mutter_text}\n\n"
+                    f"[Master's current command]:\n{current_input}"
+                )
+            current_content_payload = [{"type": "input_text", "text": text_val}]
+            
+        elif isinstance(current_input, list):
+            current_content_payload = current_input.copy()  # Tránh sửa trực tiếp list gốc
+            if unanswered_mutterings:
+                mutter_text = "\n".join([f"- {m}" for m in unanswered_mutterings])
+                current_content_payload.insert(0, {
+                    "type": "input_text", 
+                    "text": f"[System Note: Master's previous unaddressed mutterings]:\n{mutter_text}\n\n[Master's current command]:"
+                })
+
+        # Bọc toàn bộ vào Item Object type "message" chuẩn API
+        current_message_item = {
+            "type": "message",
+            "role": role,
+            "content": current_content_payload
+        }
 
         if latest_response_id:
-            request_params["input"] = final_input_payload
+            request_params["input"] = [current_message_item]
             request_params["previous_response_id"] = latest_response_id
         else:
             print(f"[Brain] Tái thiết lập ngữ cảnh từ ChatHistoryStorage ({len(ChatHistoryStorage)} tin nhắn)...")
@@ -217,8 +250,14 @@ async def RunFairyMain(input: str | list , model=MODEL_1, role="user", session="
                 content = msg.get("content")
                 role_name = msg.get("role")
                 if role_name in ["user", "assistant"] and isinstance(content, str):
-                    clean_history.append({"role": role_name, "content": content})
-            request_params["input"] = clean_history if clean_history else final_input_payload
+                    clean_history.append({
+                        "type": "message",
+                        "role": role_name,
+                        "content": [{"type": "input_text", "text": content}]
+                    })
+            
+            clean_history.append(current_message_item)
+            request_params["input"] = clean_history
 
     if use_tool:
         request_params["tools"] = use_tool
@@ -235,21 +274,26 @@ async def RunFairyMain(input: str | list , model=MODEL_1, role="user", session="
         )
     except BadRequestError as err:
         err_str = str(err)
-        # Bắt dính lỗi Lạc ID hoặc Không tìm thấy Tool do bị ngắt
         if "previous_response_not_found" in err_str or "No tool call found" in err_str:
             print(f"[Brain] Xung đột ID cũ ({latest_response_id}). Đang tự động hạ cấp cấu hình...")
             latest_response_id = None
             request_params.pop("previous_response_id", None)
             
-            # Nếu đang ở vòng tool mà bị lạc mất gốc, quay về nạp lịch sử Text
             if type in ["function_call", "computer_call"]:
                 clean_history = [
-                    {"role": m["role"], "content": m["content"]}
+                    {
+                        "type": "message",
+                        "role": m["role"],
+                        "content": [{"type": "input_text", "text": m["content"]}]
+                    }
                     for m in ChatHistoryStorage if isinstance(m.get("content"), str)
                 ]
-                request_params["input"] = clean_history if clean_history else "Master requested an action that was refreshed."
+                request_params["input"] = clean_history if clean_history else [{
+                    "type": "message", 
+                    "role": "user", 
+                    "content": [{"type": "input_text", "text": "Master requested an action that was refreshed."}]
+                }]
 
-            # Thử gọi lại lần nữa bằng Context sạch
             FairyResponse = await FairyMain.responses.create(
                 **request_params, stream=True, reasoning={"effort": reasoning_effort}
             )
@@ -261,11 +305,10 @@ async def RunFairyMain(input: str | list , model=MODEL_1, role="user", session="
     full_sentence = ""
 
     # ==========================================
-    # STREAM XỬ LÝ
+    # STREAM XỬ LÝ (Phần còn lại giữ nguyên như của bạn)
     # ==========================================
     async for item in FairyResponse:
         
-
         if item.type == "response.created":
             latest_response_id = item.response.id
 
